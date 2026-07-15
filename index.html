@@ -228,7 +228,7 @@ trojan://password@host:443?sni=...#Backup"></textarea>
   </div>
 
   <footer>
-    <span id="footer-note">xray0 · gateway 10.10.0.1/24 · autoOutboundsInterface: auto</span>
+    <span id="footer-note">xray0 · dual-stack gateway · autoOutboundsInterface: auto</span>
     <span>no network calls · no telemetry · <a href="https://xtls.github.io/en/config/" target="_blank" rel="noopener">Xray-core docs</a></span>
   </footer>
 
@@ -371,10 +371,13 @@ function buildConfig(outbounds, extraDirectDomains, useTun){
     inbounds.push({
       tag: 'tun-in', port: 0, protocol: 'tun',
       settings: {
-        name: 'xray0', mtu: 1500, gateway: ['10.10.0.1/24'], dns: ['8.8.8.8'],
-        autoSystemRoutingTable: ['0.0.0.0/0'], autoOutboundsInterface: 'auto'
+        name: 'xray0', mtu: 1500,
+        gateway: ['10.10.0.1/24', 'fc00::a:b:c:d/64'],
+        dns: ['8.8.8.8', '1.1.1.1'],
+        autoSystemRoutingTable: ['0.0.0.0/0', '::/0'],
+        autoOutboundsInterface: 'auto'
       },
-      sniffing: { destOverride: ['http','tls','quic','fakedns'], enabled: true }
+      sniffing: { destOverride: ['http','tls','quic','fakedns'], enabled: true, routeOnly: true }
     });
   }
   inbounds.push(
@@ -402,7 +405,7 @@ function buildConfig(outbounds, extraDirectDomains, useTun){
     },
     remarks: 'Generated_by_url2xray',
     routing: {
-      domainStrategy: 'AsIs',
+      domainStrategy: useTun ? 'IPIfNonMatch' : 'AsIs',
       rules: [
         { ip: ['geoip:private'], outboundTag: 'direct', type: 'field' },
         { domain: ['geosite:private', ...extraDirectDomains], outboundTag: 'direct', type: 'field' },
@@ -427,7 +430,7 @@ document.querySelectorAll('#mode-toggle button').forEach(btn=>{
       : 'No admin rights needed — point apps at 127.0.0.1:10808 (SOCKS) or :10809 (HTTP).';
     $('f-tun').textContent = useTun ? 'tun-in :: xray0' : 'socks-in :10808';
     $('footer-note').textContent = useTun
-      ? 'xray0 · gateway 10.10.0.1/24 · autoOutboundsInterface: auto'
+      ? 'xray0 · dual-stack gateway · autoOutboundsInterface: auto'
       : 'socks :10808 · http :10809 · no elevation required';
   });
 });
