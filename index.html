@@ -100,6 +100,16 @@
   .seg button.active{background:var(--amber); color:#1a1206; font-weight:600;}
   .seg button:not(.active):hover{color:var(--text);}
   .mode-note{font-size:11px; color:var(--dim); margin-top:6px; font-family:var(--mono);}
+  .mode-note.warn-note{color:var(--red);}
+
+  .check-row{
+    display:flex; align-items:center; gap:8px; cursor:pointer;
+    font-family:var(--mono); font-size:12px; text-transform:none; letter-spacing:0;
+    color:var(--text); margin-bottom:0;
+  }
+  .check-row input[type=checkbox]{
+    width:16px; height:16px; accent-color:var(--amber); cursor:pointer; flex-shrink:0;
+  }
 
   button{
     font-family:var(--mono); font-size:13px; font-weight:600; letter-spacing:.02em;
@@ -181,6 +191,18 @@ trojan://password@host:443?sni=...#Backup"></textarea>
         </div>
         <div class="mode-note" id="mode-note">Requires running Xray as Administrator on Windows.</div>
       </div>
+      <div class="field">
+        <label>Override SNI (optional)</label>
+        <input type="text" id="sni-override" placeholder="Leave blank to use each link's own sni">
+        <div class="mode-note">Applies to every link that uses TLS or REALITY. Overrides the sni= in the link itself.</div>
+      </div>
+      <div class="field">
+        <label class="check-row" for="allow-insecure">
+          <input type="checkbox" id="allow-insecure">
+          Allow insecure connections (skip TLS certificate verification)
+        </label>
+        <div class="mode-note warn-note">Only for self-signed certs / testing. Leaves you open to MITM — don't use this against untrusted networks.</div>
+      </div>
       <div class="row">
         <button class="btn-primary" id="convert">Generate config →</button>
         <span class="status" id="status"></span>
@@ -223,20 +245,21 @@ const METHOD_MAP = {
 };
 function flowAllowed(method, security){ return method === 'raw' && (security === 'tls' || security === 'reality'); }
 
-function buildStreamSettings(methodRaw, security, q, hostname){
+function buildStreamSettings(methodRaw, security, q, hostname, overrides){
+  overrides = overrides || {};
   const method = METHOD_MAP[methodRaw] || 'raw';
   const stream = { method, security };
 
   if(security === 'reality'){
     stream.realitySettings = {
       fingerprint: q.fp || 'random', publicKey: q.pbk || '',
-      serverName: q.sni || hostname, shortId: q.sid || '',
+      serverName: overrides.sni || q.sni || hostname, shortId: q.sid || '',
       show: false, spiderX: decodeURIComponent(q.spx || '')
     };
   } else if(security === 'tls'){
     stream.tlsSettings = {
-      serverName: q.sni || hostname, fingerprint: q.fp || 'chrome',
-      allowInsecure: q.allowInsecure === '1'
+      serverName: overrides.sni || q.sni || hostname, fingerprint: q.fp || 'chrome',
+      allowInsecure: overrides.allowInsecure === true ? true : (q.allowInsecure === '1')
     };
   }
 
@@ -256,11 +279,11 @@ function buildStreamSettings(methodRaw, security, q, hostname){
   return stream;
 }
 
-function parseVless(link){
+function parseVless(link, overrides){
   const u = new URL(link);
   const q = Object.fromEntries(u.searchParams.entries());
   const security = q.security || 'none';
-  const stream = buildStreamSettings(q.type || 'tcp', security, q, u.hostname);
+  const stream = buildStreamSettings(q.type || 'tcp', security, q, u.hostname, overrides);
 
   const settings = {
     address: u.hostname, port: Number(u.port),
@@ -271,7 +294,7 @@ function parseVless(link){
   return { protocol: 'vless', tag: 'proxy', streamSettings: stream, settings };
 }
 
-function parseVmess(link){
+function parseVmess(link, overrides){
   const raw = link.slice('vmess://'.length);
   const data = JSON.parse(b64decode(raw));
   const security = data.tls === 'tls' ? 'tls' : 'none';
@@ -280,7 +303,7 @@ function parseVmess(link){
     headerType: data.type || 'none', serviceName: data.path || '',
     mode: data.mode || 'gun', sni: data.sni || data.host || '', fp: data.fp || 'chrome'
   };
-  const stream = buildStreamSettings(data.net || 'tcp', security, q, data.add);
+  const stream = buildStreamSettings(data.net || 'tcp', security, q, data.add, overrides);
 
   return {
     protocol: 'vmess', tag: 'proxy', streamSettings: stream,
@@ -288,11 +311,11 @@ function parseVmess(link){
   };
 }
 
-function parseTrojan(link){
+function parseTrojan(link, overrides){
   const u = new URL(link);
   const q = Object.fromEntries(u.searchParams.entries());
   const security = q.security || 'tls';
-  const stream = buildStreamSettings(q.type || 'tcp', security, q, u.hostname);
+  const stream = buildStreamSettings(q.type || 'tcp', security, q, u.hostname, overrides);
 
   return {
     protocol: 'trojan', tag: 'proxy', streamSettings: stream,
@@ -327,11 +350,11 @@ function parseSS(link){
 
 const PARSERS = { vless: parseVless, vmess: parseVmess, trojan: parseTrojan, ss: parseSS };
 
-function parseLink(link){
+function parseLink(link, overrides){
   link = link.trim();
   const scheme = link.split('://')[0].toLowerCase();
   if(!PARSERS[scheme]) throw new Error(`Unsupported scheme: ${scheme}`);
-  return PARSERS[scheme](link);
+  return PARSERS[scheme](link, overrides);
 }
 
 function buildConfig(outbounds, extraDirectDomains, useTun){
@@ -426,10 +449,14 @@ $('convert').addEventListener('click', () => {
     return;
   }
 
+  const sniOverride = $('sni-override').value.trim();
+  const allowInsecure = $('allow-insecure').checked;
+  const overrides = { sni: sniOverride || null, allowInsecure };
+
   const outbounds = [];
   lines.forEach((link, i) => {
     try{
-      const ob = parseLink(link);
+      const ob = parseLink(link, overrides);
       if(i > 0) ob.tag = `proxy-${i}`;
       outbounds.push(ob);
       const b = document.createElement('span');
@@ -440,6 +467,12 @@ $('convert').addEventListener('click', () => {
         const w = document.createElement('span');
         w.className = 'badge warn';
         w.textContent = `${ob.tag}: dropped incompatible flow`;
+        badges.appendChild(w);
+      }
+      if(allowInsecure && ob.streamSettings && ob.streamSettings.tlsSettings){
+        const w = document.createElement('span');
+        w.className = 'badge warn';
+        w.textContent = `${ob.tag}: allowInsecure=true`;
         badges.appendChild(w);
       }
     }catch(e){
