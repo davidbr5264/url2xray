@@ -199,9 +199,14 @@ trojan://password@host:443?sni=...#Backup"></textarea>
       <div class="field">
         <label class="check-row" for="allow-insecure">
           <input type="checkbox" id="allow-insecure">
-          Allow insecure connections (skip TLS certificate verification)
+          Allow insecure (legacy Xray-core &lt; v26.2.6 only)
         </label>
-        <div class="mode-note warn-note">Only for self-signed certs / testing. Leaves you open to MITM — don't use this against untrusted networks.</div>
+        <div class="mode-note warn-note">Xray-core removed allowInsecure in v26.2.6 (June 2026). On current builds it's ignored — use pinned cert SHA256 below instead.</div>
+      </div>
+      <div class="field">
+        <label>Pinned cert SHA256 (optional, current Xray-core)</label>
+        <input type="text" id="pinned-cert" placeholder="comma separated, e.g. AB:CD:...  or  ab12cd34...">
+        <div class="mode-note">Get this by running: xray tls ping yourhost.com — copy the leaf cert's SHA256.</div>
       </div>
       <div class="row">
         <button class="btn-primary" id="convert">Generate config →</button>
@@ -261,6 +266,9 @@ function buildStreamSettings(methodRaw, security, q, hostname, overrides){
       serverName: overrides.sni || q.sni || hostname, fingerprint: q.fp || 'chrome',
       allowInsecure: overrides.allowInsecure === true ? true : (q.allowInsecure === '1')
     };
+    if(overrides.pinnedCert && overrides.pinnedCert.length){
+      stream.tlsSettings.pinnedPeerCertSha256 = overrides.pinnedCert;
+    }
   }
 
   if(method === 'raw'){
@@ -451,7 +459,8 @@ $('convert').addEventListener('click', () => {
 
   const sniOverride = $('sni-override').value.trim();
   const allowInsecure = $('allow-insecure').checked;
-  const overrides = { sni: sniOverride || null, allowInsecure };
+  const pinnedCert = $('pinned-cert').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const overrides = { sni: sniOverride || null, allowInsecure, pinnedCert };
 
   const outbounds = [];
   lines.forEach((link, i) => {
