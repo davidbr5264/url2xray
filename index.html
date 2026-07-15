@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>url2xray — link to config, in your browser</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+
+  :root{
+    --bg:#0d1013;
+    --panel:#151a1f;
+    --panel-2:#1b2129;
+    --line:#262e37;
+    --text:#dfe6ec;
+    --dim:#8a96a3;
+    --amber:#ffb020;
+    --teal:#54e0c7;
+    --red:#ff6b6b;
+    --mono:'IBM Plex Mono', monospace;
+    --sans:'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:var(--sans); line-height:1.5;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size:32px 32px;
+    background-position:-1px -1px;
+    background-attachment:fixed;
+    min-height:100vh;
+  }
+  .wrap{max-width:920px; margin:0 auto; padding:56px 24px 80px;}
+
+  header{margin-bottom:40px;}
+  .eyebrow{
+    font-family:var(--mono); font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--amber); display:flex; align-items:center; gap:8px; margin-bottom:14px;
+  }
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--amber); box-shadow:0 0 8px var(--amber);}
+  h1{
+    font-family:var(--mono); font-weight:700; font-size:clamp(28px,4vw,42px);
+    margin:0 0 12px; letter-spacing:-0.01em; color:#fff;
+  }
+  h1 span{color:var(--dim); font-weight:400;}
+  .sub{color:var(--dim); font-size:15px; max-width:60ch;}
+  .sub b{color:var(--text); font-weight:500;}
+
+  .flow{
+    display:flex; align-items:center; gap:0; margin:28px 0 8px;
+    font-family:var(--mono); font-size:11px; color:var(--dim); flex-wrap:wrap;
+  }
+  .flow .node{
+    border:1px solid var(--line); background:var(--panel-2); padding:5px 10px;
+    border-radius:4px; white-space:nowrap;
+  }
+  .flow .node.active{border-color:var(--amber); color:var(--amber);}
+  .flow .arrow{padding:0 8px; color:var(--line);}
+
+  .grid{display:grid; grid-template-columns:1fr; gap:20px; margin-top:32px;}
+  @media(min-width:760px){ .grid{grid-template-columns: 1.3fr 1fr;} }
+
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:20px;
+  }
+  .panel h2{
+    font-family:var(--mono); font-size:12px; text-transform:uppercase; letter-spacing:.1em;
+    color:var(--dim); margin:0 0 14px; font-weight:600;
+  }
+
+  textarea, input[type=text]{
+    width:100%; background:#0a0c0e; border:1px solid var(--line); color:var(--text);
+    font-family:var(--mono); font-size:13px; border-radius:6px; padding:12px;
+    resize:vertical; outline:none;
+  }
+  textarea:focus, input[type=text]:focus{border-color:var(--amber);}
+  textarea{min-height:150px;}
+  ::placeholder{color:#4a5560;}
+
+  .field{margin-bottom:16px;}
+  .field label{
+    display:block; font-family:var(--mono); font-size:11px; color:var(--dim);
+    margin-bottom:6px; text-transform:uppercase; letter-spacing:.06em;
+  }
+
+  .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+
+  /* Segmented toggle for tun / socks-only */
+  .seg{
+    display:inline-flex; border:1px solid var(--line); border-radius:6px; overflow:hidden;
+    font-family:var(--mono); font-size:12px;
+  }
+  .seg button{
+    background:transparent; border:none; color:var(--dim); padding:8px 14px;
+    border-radius:0; cursor:pointer; font-family:var(--mono); font-size:12px;
+  }
+  .seg button.active{background:var(--amber); color:#1a1206; font-weight:600;}
+  .seg button:not(.active):hover{color:var(--text);}
+  .mode-note{font-size:11px; color:var(--dim); margin-top:6px; font-family:var(--mono);}
+
+  button{
+    font-family:var(--mono); font-size:13px; font-weight:600; letter-spacing:.02em;
+    padding:11px 18px; border-radius:6px; border:1px solid transparent; cursor:pointer;
+    transition:transform .08s ease, background .15s ease;
+  }
+  button:active{transform:scale(.97);}
+  .btn-primary{background:var(--amber); color:#1a1206;}
+  .btn-primary:hover{background:#ffc04d;}
+  .btn-ghost{background:transparent; border-color:var(--line); color:var(--text);}
+  .btn-ghost:hover{border-color:var(--dim);}
+  .btn-ghost:disabled{opacity:.4; cursor:not-allowed;}
+
+  .badges{display:flex; gap:6px; flex-wrap:wrap; min-height:24px; margin-top:10px;}
+  .badge{
+    font-family:var(--mono); font-size:11px; padding:3px 8px; border-radius:20px;
+    border:1px solid var(--line); color:var(--dim);
+  }
+  .badge.ok{border-color:var(--teal); color:var(--teal);}
+  .badge.err{border-color:var(--red); color:var(--red);}
+  .badge.warn{border-color:var(--amber); color:var(--amber);}
+
+  .out-wrap{position:relative;}
+  #output{min-height:380px; font-size:12px; white-space:pre;}
+  .out-actions{display:flex; gap:8px; margin-top:12px;}
+
+  .status{font-family:var(--mono); font-size:12px; color:var(--dim); margin-top:10px; min-height:16px;}
+  .status.err{color:var(--red);}
+  .status.ok{color:var(--teal);}
+
+  footer{
+    margin-top:48px; padding-top:20px; border-top:1px solid var(--line);
+    font-family:var(--mono); font-size:11px; color:var(--dim); display:flex;
+    justify-content:space-between; flex-wrap:wrap; gap:8px;
+  }
+  a{color:var(--amber); text-decoration:none;}
+  a:hover{text-decoration:underline;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow"><span class="dot"></span>runs entirely in your browser — nothing sent anywhere</div>
+    <h1>url2xray<span> / tun edition</span></h1>
+    <div class="sub">Paste one or more <b>vless / vmess / trojan / ss</b> links. Get back a full
+    Xray-core <b>config.json</b>, matching the current official outbound schema.</div>
+  </header>
+
+  <div class="flow">
+    <div class="node" id="f-link">share link</div>
+    <div class="arrow">→</div>
+    <div class="node" id="f-parse">parser</div>
+    <div class="arrow">→</div>
+    <div class="node" id="f-tun">inbound</div>
+    <div class="arrow">→</div>
+    <div class="node" id="f-route">routing</div>
+    <div class="arrow">→</div>
+    <div class="node" id="f-out">config.json</div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Input</h2>
+      <div class="field">
+        <label>Share links — one per line</label>
+        <textarea id="links" placeholder="vless://uuid@host:443?security=reality&sni=...&pbk=...&sid=...#My+Server
+trojan://password@host:443?sni=...#Backup"></textarea>
+      </div>
+      <div class="field">
+        <label>Bypass domains (comma separated, optional)</label>
+        <input type="text" id="direct" placeholder="youtube.com, dialog.lk, mrt.ac.lk">
+      </div>
+      <div class="field">
+        <label>Inbound mode</label>
+        <div class="seg" id="mode-toggle">
+          <button class="active" data-mode="tun">TUN (system-wide)</button>
+          <button data-mode="socks">Socks/HTTP only</button>
+        </div>
+        <div class="mode-note" id="mode-note">Requires running Xray as Administrator on Windows.</div>
+      </div>
+      <div class="row">
+        <button class="btn-primary" id="convert">Generate config →</button>
+        <span class="status" id="status"></span>
+      </div>
+      <div class="badges" id="badges"></div>
+    </div>
+
+    <div class="panel">
+      <h2>config.json</h2>
+      <div class="out-wrap">
+        <textarea id="output" readonly placeholder="// output appears here"></textarea>
+      </div>
+      <div class="out-actions">
+        <button class="btn-ghost" id="copy" disabled>Copy</button>
+        <button class="btn-ghost" id="download" disabled>Download</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span id="footer-note">xray0 · gateway 10.10.0.1/24 · autoOutboundsInterface: auto</span>
+    <span>no network calls · no telemetry · <a href="https://xtls.github.io/en/config/" target="_blank" rel="noopener">Xray-core docs</a></span>
+  </footer>
+
+</div>
+
+<script>
+function b64pad(s){ return s + "=".repeat((4 - s.length % 4) % 4); }
+function b64decode(s){
+  s = s.replace(/-/g,'+').replace(/_/g,'/');
+  return decodeURIComponent(atob(b64pad(s)).split('').map(c =>
+    '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+}
+
+// share-link "type=" values -> current Xray-core streamSettings.method
+const METHOD_MAP = {
+  tcp:'raw', raw:'raw', ws:'websocket', websocket:'websocket', grpc:'grpc',
+  kcp:'mkcp', mkcp:'mkcp', http:'xhttp', xhttp:'xhttp', httpupgrade:'httpupgrade',
+  quic:'raw'
+};
+function flowAllowed(method, security){ return method === 'raw' && (security === 'tls' || security === 'reality'); }
+
+function buildStreamSettings(methodRaw, security, q, hostname){
+  const method = METHOD_MAP[methodRaw] || 'raw';
+  const stream = { method, security };
+
+  if(security === 'reality'){
+    stream.realitySettings = {
+      fingerprint: q.fp || 'random', publicKey: q.pbk || '',
+      serverName: q.sni || hostname, shortId: q.sid || '',
+      show: false, spiderX: decodeURIComponent(q.spx || '')
+    };
+  } else if(security === 'tls'){
+    stream.tlsSettings = {
+      serverName: q.sni || hostname, fingerprint: q.fp || 'chrome',
+      allowInsecure: q.allowInsecure === '1'
+    };
+  }
+
+  if(method === 'raw'){
+    stream.rawSettings = { header: { type: q.headerType || 'none' } };
+  } else if(method === 'websocket'){
+    stream.wsSettings = { path: decodeURIComponent(q.path||'/'), headers:{ Host: q.host || hostname } };
+  } else if(method === 'grpc'){
+    stream.grpcSettings = { serviceName: decodeURIComponent(q.serviceName||''), multiMode: (q.mode||'gun') === 'multi' };
+  } else if(method === 'xhttp'){
+    stream.xhttpSettings = { path: decodeURIComponent(q.path||'/'), host: q.host || hostname, mode: q.mode || 'auto' };
+  } else if(method === 'httpupgrade'){
+    stream.httpupgradeSettings = { path: decodeURIComponent(q.path||'/'), host: q.host || hostname };
+  } else if(method === 'mkcp'){
+    stream.kcpSettings = { header: { type: q.headerType || 'none' } };
+  }
+  return stream;
+}
+
+function parseVless(link){
+  const u = new URL(link);
+  const q = Object.fromEntries(u.searchParams.entries());
+  const security = q.security || 'none';
+  const stream = buildStreamSettings(q.type || 'tcp', security, q, u.hostname);
+
+  const settings = {
+    address: u.hostname, port: Number(u.port),
+    id: decodeURIComponent(u.username), encryption: q.encryption || 'none', level: 0
+  };
+  if(q.flow && flowAllowed(stream.method, security)) settings.flow = q.flow;
+
+  return { protocol: 'vless', tag: 'proxy', streamSettings: stream, settings };
+}
+
+function parseVmess(link){
+  const raw = link.slice('vmess://'.length);
+  const data = JSON.parse(b64decode(raw));
+  const security = data.tls === 'tls' ? 'tls' : 'none';
+  const q = {
+    path: data.path || '/', host: data.host || data.sni || '',
+    headerType: data.type || 'none', serviceName: data.path || '',
+    mode: data.mode || 'gun', sni: data.sni || data.host || '', fp: data.fp || 'chrome'
+  };
+  const stream = buildStreamSettings(data.net || 'tcp', security, q, data.add);
+
+  return {
+    protocol: 'vmess', tag: 'proxy', streamSettings: stream,
+    settings: { address: data.add, port: Number(data.port), id: data.id, security: data.scy || 'auto', level: 0 }
+  };
+}
+
+function parseTrojan(link){
+  const u = new URL(link);
+  const q = Object.fromEntries(u.searchParams.entries());
+  const security = q.security || 'tls';
+  const stream = buildStreamSettings(q.type || 'tcp', security, q, u.hostname);
+
+  return {
+    protocol: 'trojan', tag: 'proxy', streamSettings: stream,
+    settings: { address: u.hostname, port: Number(u.port), password: decodeURIComponent(u.username), level: 0 }
+  };
+}
+
+function parseSS(link){
+  let raw = link.slice('ss://'.length);
+  if(raw.includes('#')) raw = raw.split('#')[0];
+  let method, password, host, port;
+  if(raw.includes('@')){
+    let [userinfo, hostport] = raw.split('@');
+    try{ userinfo = b64decode(userinfo); }catch(e){ userinfo = decodeURIComponent(userinfo); }
+    [method, password] = userinfo.split(':');
+    const idx = hostport.lastIndexOf(':');
+    host = hostport.slice(0, idx);
+    port = hostport.slice(idx+1).split(/[?/]/)[0];
+  } else {
+    const decoded = b64decode(raw);
+    const [methodPw, hostport] = decoded.split('@');
+    [method, password] = methodPw.split(':');
+    const idx = hostport.lastIndexOf(':');
+    host = hostport.slice(0, idx);
+    port = hostport.slice(idx+1);
+  }
+  return {
+    protocol: 'shadowsocks', tag: 'proxy',
+    settings: { address: host, port: Number(port), method, password, level: 0 }
+  };
+}
+
+const PARSERS = { vless: parseVless, vmess: parseVmess, trojan: parseTrojan, ss: parseSS };
+
+function parseLink(link){
+  link = link.trim();
+  const scheme = link.split('://')[0].toLowerCase();
+  if(!PARSERS[scheme]) throw new Error(`Unsupported scheme: ${scheme}`);
+  return PARSERS[scheme](link);
+}
+
+function buildConfig(outbounds, extraDirectDomains, useTun){
+  const inbounds = [];
+  if(useTun){
+    inbounds.push({
+      tag: 'tun-in', port: 0, protocol: 'tun',
+      settings: {
+        name: 'xray0', mtu: 1500, gateway: ['10.10.0.1/24'], dns: ['8.8.8.8'],
+        autoSystemRoutingTable: ['0.0.0.0/0'], autoOutboundsInterface: 'auto'
+      },
+      sniffing: { destOverride: ['http','tls','quic','fakedns'], enabled: true }
+    });
+  }
+  inbounds.push(
+    {
+      port: 10808, protocol: 'socks',
+      settings: { auth: 'noauth', udp: true, userLevel: 8 },
+      sniffing: { destOverride: ['http','tls','quic','fakedns'], enabled: true },
+      tag: 'socks'
+    },
+    { port: 10809, protocol: 'http', settings: { userLevel: 8 }, tag: 'http' }
+  );
+
+  return {
+    dns: { queryStrategy: 'UseIP', servers: [{ address: '8.8.8.8', skipFallback: false }], tag: 'dns_out' },
+    inbounds,
+    log: { loglevel: 'warning' },
+    outbounds: [
+      ...outbounds,
+      { protocol: 'freedom', settings: { domainStrategy: 'AsIs', noises: [], redirect: '' }, tag: 'direct' },
+      { protocol: 'blackhole', settings: { response: { type: 'http' } }, tag: 'block' }
+    ],
+    policy: {
+      levels: { '8': { connIdle: 300, downlinkOnly: 1, handshake: 4, uplinkOnly: 1 } },
+      system: { statsOutboundDownlink: true, statsOutboundUplink: true }
+    },
+    remarks: 'Generated_by_url2xray',
+    routing: {
+      domainStrategy: 'AsIs',
+      rules: [
+        { ip: ['geoip:private'], outboundTag: 'direct', type: 'field' },
+        { domain: ['geosite:private', ...extraDirectDomains], outboundTag: 'direct', type: 'field' },
+        { network: 'tcp,udp', outboundTag: 'proxy', type: 'field' }
+      ]
+    },
+    stats: {}
+  };
+}
+
+const $ = id => document.getElementById(id);
+const flowNodes = ['f-link','f-parse','f-tun','f-route','f-out'];
+let useTun = true;
+
+document.querySelectorAll('#mode-toggle button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#mode-toggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    useTun = btn.dataset.mode === 'tun';
+    $('mode-note').textContent = useTun
+      ? 'Requires running Xray as Administrator on Windows.'
+      : 'No admin rights needed — point apps at 127.0.0.1:10808 (SOCKS) or :10809 (HTTP).';
+    $('f-tun').textContent = useTun ? 'tun-in :: xray0' : 'socks-in :10808';
+    $('footer-note').textContent = useTun
+      ? 'xray0 · gateway 10.10.0.1/24 · autoOutboundsInterface: auto'
+      : 'socks :10808 · http :10809 · no elevation required';
+  });
+});
+
+function pulseFlow(){
+  flowNodes.forEach((id,i)=>{
+    setTimeout(()=>{
+      document.querySelectorAll('.node').forEach(n=>n.classList.remove('active'));
+      $(id).classList.add('active');
+      if(i === flowNodes.length-1) setTimeout(()=>$(id).classList.remove('active'), 400);
+    }, i*90);
+  });
+}
+
+$('convert').addEventListener('click', () => {
+  const lines = $('links').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  const direct = $('direct').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const badges = $('badges');
+  const status = $('status');
+  badges.innerHTML = '';
+  status.textContent = '';
+  status.className = 'status';
+
+  if(lines.length === 0){
+    status.textContent = 'Paste at least one share link.';
+    status.className = 'status err';
+    return;
+  }
+
+  const outbounds = [];
+  lines.forEach((link, i) => {
+    try{
+      const ob = parseLink(link);
+      if(i > 0) ob.tag = `proxy-${i}`;
+      outbounds.push(ob);
+      const b = document.createElement('span');
+      b.className = 'badge ok';
+      b.textContent = `${ob.protocol} → ${ob.tag}`;
+      badges.appendChild(b);
+      if(ob.streamSettings && ob.streamSettings.method === 'raw' && link.includes('flow=') && !('flow' in ob.settings)){
+        const w = document.createElement('span');
+        w.className = 'badge warn';
+        w.textContent = `${ob.tag}: dropped incompatible flow`;
+        badges.appendChild(w);
+      }
+    }catch(e){
+      const b = document.createElement('span');
+      b.className = 'badge err';
+      b.textContent = `line ${i+1}: ${e.message}`;
+      badges.appendChild(b);
+    }
+  });
+
+  if(outbounds.length === 0){
+    status.textContent = 'No valid links parsed.';
+    status.className = 'status err';
+    return;
+  }
+
+  const config = buildConfig(outbounds, direct, useTun);
+  $('output').value = JSON.stringify(config, null, 2);
+  $('copy').disabled = false;
+  $('download').disabled = false;
+  status.textContent = `Generated config with ${outbounds.length} outbound(s). Active: ${outbounds[0].tag}`;
+  status.className = 'status ok';
+  pulseFlow();
+});
+
+$('copy').addEventListener('click', async () => {
+  await navigator.clipboard.writeText($('output').value);
+  const s = $('status');
+  s.textContent = 'Copied to clipboard.';
+  s.className = 'status ok';
+});
+
+$('download').addEventListener('click', () => {
+  const blob = new Blob([$('output').value], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'config.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
