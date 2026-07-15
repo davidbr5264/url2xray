@@ -303,6 +303,7 @@ function parseVless(link){
     id: ++serverIdCounter, protocol:'vless', remark: remark || address, address, port, raw: link,
     uuid: decodeURIComponent(parts.userinfo),
     flow: query.get('flow') || '',
+    encryption: query.get('encryption') ? decodeURIComponent(query.get('encryption')) : 'none',
     transport: extractTransport(query, address)
   };
 }
@@ -315,7 +316,6 @@ function parseTrojan(link){
   return {
     id: ++serverIdCounter, protocol:'trojan', remark: remark || address, address, port, raw: link,
     password: decodeURIComponent(parts.userinfo),
-    flow: query.get('flow') || '',
     transport: extractTransport(query, address, 'tls') // trojan defaults to tls
   };
 }
@@ -434,21 +434,32 @@ function parseAnyLink(link){
 }
 
 // ---------- stream settings builder (vless/vmess/trojan) ----------
+// Reflects current xray-core schema: "raw" replaces the old "tcp" name (rawSettings),
+// "websocket" replaces "ws" (wsSettings key unchanged), the old "http"/"h2" transport was
+// removed entirely in favor of XHTTP, and mKCP dropped its header/seed fields (now handled
+// by the separate FinalMask layer, which this generator does not attempt to reconstruct
+// from a share-link since there's no established URI convention for it yet).
 function buildStreamSettings(t){
   const ss = { network: t.network };
   if(t.security === 'tls'){
     ss.security = 'tls';
-    ss.tlsSettings = { serverName: t.sni, allowInsecure: t.allowInsecure, fingerprint: t.fp };
+    ss.tlsSettings = { serverName: t.sni, fingerprint: t.fp };
     if(t.alpn) ss.tlsSettings.alpn = t.alpn.split(',');
+    // allowInsecure is deprecated in current xray-core (migrated toward pinnedPeerCertSha256),
+    // but still documented and functional, so only emit it when the link actually asked for it.
+    if(t.allowInsecure) ss.tlsSettings.allowInsecure = true;
   } else if(t.security === 'reality'){
     ss.security = 'reality';
-    ss.realitySettings = { serverName: t.sni, fingerprint: t.fp, publicKey: t.pbk, shortId: t.sid || '', spiderX: t.spx || '' };
+    // Client-side REALITY field was renamed publicKey -> password in current xray-core.
+    ss.realitySettings = { serverName: t.sni, fingerprint: t.fp, password: t.pbk, shortId: t.sid || '', spiderX: t.spx || '' };
   } else {
     ss.security = 'none';
   }
 
   switch(t.network){
     case 'ws':
+    case 'websocket':
+      ss.network = 'websocket';
       ss.wsSettings = { path: t.path || '/' };
       if(t.host) ss.wsSettings.headers = { Host: t.host };
       break;
@@ -457,8 +468,9 @@ function buildStreamSettings(t){
       break;
     case 'http':
     case 'h2':
-      ss.network = 'http';
-      ss.httpSettings = { host: [t.host || t.sni], path: t.path || '/' };
+      // Removed from xray-core; XHTTP is the direct replacement and covers H2 & H3.
+      ss.network = 'xhttp';
+      ss.xhttpSettings = { path: t.path || '/', host: t.host || t.sni, mode: 'auto' };
       break;
     case 'httpupgrade':
       ss.httpupgradeSettings = { path: t.path || '/', host: t.host || t.sni };
@@ -469,58 +481,68 @@ function buildStreamSettings(t){
       ss.xhttpSettings = { path: t.path || '/', host: t.host || t.sni, mode: 'auto' };
       break;
     case 'kcp':
+    case 'mkcp':
+      ss.network = 'mkcp';
       ss.kcpSettings = {
         mtu: 1350, tti: 20, uplinkCapacity: 5, downlinkCapacity: 20,
-        congestion: false, readBufferSize: 2, writeBufferSize: 2,
-        header: { type: t.headerType || 'none' }
+        congestion: false, readBufferSize: 2, writeBufferSize: 2
       };
-      if(t.seed) ss.kcpSettings.seed = t.seed;
       break;
     case 'quic':
       ss.quicSettings = { security: 'none', key: '', header: { type: t.headerType || 'none' } };
       break;
-    default: // tcp / raw
-      ss.network = 'tcp';
+    default: // raw (formerly "tcp")
+      ss.network = 'raw';
       if(t.headerType === 'http'){
-        ss.tcpSettings = { header: { type: 'http', request: { path: [t.path || '/'], headers: { Host: [t.host || t.sni] } } } };
+        ss.rawSettings = { header: { type: 'http', request: { path: [t.path || '/'], headers: { Host: [t.host || t.sni] } } } };
       }
   }
   return ss;
 }
 
 // ---------- outbound builders ----------
+// Current xray-core outbound settings are flat single-endpoint objects (address/port/...
+// directly under "settings"), not the old vnext/servers arrays. The core now enforces one
+// endpoint per outbound and expects routing/balancers for multi-server setups.
 function buildOutbound(server, tag){
   switch(server.protocol){
     case 'vless':
       return {
         protocol: 'vless', tag,
-        settings: { vnext: [{ address: server.address, port: server.port, users: [{ id: server.uuid, encryption: 'none', flow: server.flow || undefined, level: 0 }] }] },
+        settings: {
+          address: server.address, port: server.port, id: server.uuid,
+          encryption: server.encryption || 'none',
+          flow: server.flow || undefined,
+          level: 0
+        },
         streamSettings: buildStreamSettings(server.transport)
       };
     case 'vmess':
       return {
         protocol: 'vmess', tag,
-        settings: { vnext: [{ address: server.address, port: server.port, users: [{ id: server.uuid, alterId: server.alterId || 0, security: server.cipher || 'auto', level: 0 }] }] },
+        settings: { address: server.address, port: server.port, id: server.uuid, security: server.cipher || 'auto', level: 0 },
         streamSettings: buildStreamSettings(server.transport)
       };
     case 'trojan':
       return {
         protocol: 'trojan', tag,
-        settings: { servers: [{ address: server.address, port: server.port, password: server.password, level: 0, flow: server.flow || undefined }] },
+        settings: { address: server.address, port: server.port, password: server.password, level: 0 },
         streamSettings: buildStreamSettings(server.transport)
       };
     case 'shadowsocks':
       return {
         protocol: 'shadowsocks', tag,
-        settings: { servers: [{ address: server.address, port: server.port, method: server.method, password: server.password, level: 0 }] }
+        settings: { address: server.address, port: server.port, method: server.method, password: server.password, level: 0 }
       };
     case 'hysteria':
       return {
         protocol: 'hysteria', tag,
-        settings: { version: 2, address: server.address, port: server.port, auth: server.auth },
+        // OutboundConfigurationObject for hysteria is intentionally minimal — version/address/port only.
+        // Auth and TLS behavior live entirely in streamSettings.hysteriaSettings / tlsSettings.
+        settings: { version: 2, address: server.address, port: server.port },
         streamSettings: {
           network: 'hysteria', security: 'tls',
-          tlsSettings: { serverName: server.sni, allowInsecure: server.insecure, alpn: ['h3'] },
+          tlsSettings: Object.assign({ serverName: server.sni, alpn: ['h3'] }, server.insecure ? { allowInsecure: true } : {}),
           hysteriaSettings: { version: 2, auth: server.auth, udpIdleTimeout: 60 }
         }
       };
@@ -735,9 +757,20 @@ genBtn.addEventListener('click', () => {
   try{ cfg = buildConfig(server, opts); }
   catch(e){ outputWarning.innerHTML = '<div class="error-line">' + e.message + '</div>'; return; }
 
+  const notes = [];
   if(server.protocol === 'hysteria'){
-    outputWarning.innerHTML = '<div class="note"><b>Note:</b> Hysteria2 outbound support in xray-core is newer and has had version-to-version bugs. Test connectivity before relying on it, and check your installed xray-core changelog if it misbehaves.</div>';
+    notes.push('<b>Note:</b> Hysteria2 outbound support in xray-core is newer and has had version-to-version bugs. Test connectivity before relying on it, and check your installed xray-core changelog if it misbehaves.');
   }
+  if(server.transport && (server.transport.network === 'http' || server.transport.network === 'h2')){
+    notes.push('<b>Note:</b> this link specified the old HTTP/2 ("http"/"h2") transport, which xray-core has removed entirely. The generated config uses XHTTP instead (its direct replacement, covering H2 &amp; H3) — confirm the server side also runs XHTTP.');
+  }
+  if(server.protocol === 'vless' && server.encryption && server.encryption !== 'none'){
+    notes.push('<b>Note:</b> this link carries a non-"none" VLESS Encryption string (post-quantum ML-KEM-768/X25519). It\'s passed through as-is, but double check it was generated for this exact server — mismatched encryption strings fail the handshake.');
+  }
+  if(server.transport && server.transport.security === 'tls' && server.transport.allowInsecure){
+    notes.push('<b>Note:</b> "allowInsecure" is deprecated in current xray-core (moving toward <code>pinnedPeerCertSha256</code>) but is still honored — some newer builds may reject it. If your client fails to start, remove it and pin the certificate instead.');
+  }
+  if(notes.length) outputWarning.innerHTML = notes.map(n => '<div class="note">' + n + '</div>').join('');
 
   const json = JSON.stringify(cfg, null, 2);
   output.innerHTML = highlight(json);
