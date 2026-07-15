@@ -34,7 +34,8 @@ def flow_allowed(method: str, security: str) -> bool:
     return method == "raw" and security in ("tls", "reality")
 
 
-def build_stream_settings(method_raw: str, security: str, q: dict, hostname: str) -> dict:
+def build_stream_settings(method_raw: str, security: str, q: dict, hostname: str,
+                           sni_override: str = None, allow_insecure_override: bool = False) -> dict:
     method = METHOD_MAP.get(method_raw, "raw")
     stream = {"method": method, "security": security}
 
@@ -42,16 +43,16 @@ def build_stream_settings(method_raw: str, security: str, q: dict, hostname: str
         stream["realitySettings"] = {
             "fingerprint": q.get("fp", "random"),
             "publicKey": q.get("pbk", ""),
-            "serverName": q.get("sni", hostname),
+            "serverName": sni_override or q.get("sni", hostname),
             "shortId": q.get("sid", ""),
             "show": False,
             "spiderX": unquote(q.get("spx", "")),
         }
     elif security == "tls":
         stream["tlsSettings"] = {
-            "serverName": q.get("sni", hostname),
+            "serverName": sni_override or q.get("sni", hostname),
             "fingerprint": q.get("fp", "chrome"),
-            "allowInsecure": q.get("allowInsecure", "0") == "1",
+            "allowInsecure": True if allow_insecure_override else q.get("allowInsecure", "0") == "1",
         }
 
     if method == "raw":
@@ -87,12 +88,12 @@ def b64pad(s: str) -> str:
     return s + "=" * (-len(s) % 4)
 
 
-def parse_vless(link: str) -> dict:
+def parse_vless(link: str, sni_override: str = None, allow_insecure_override: bool = False) -> dict:
     u = urlparse(link)
     q = {k: v[0] for k, v in parse_qs(u.query).items()}
     security = q.get("security", "none")
     method_raw = q.get("type", "tcp")
-    stream = build_stream_settings(method_raw, security, q, u.hostname)
+    stream = build_stream_settings(method_raw, security, q, u.hostname, sni_override, allow_insecure_override)
 
     settings = {
         "address": u.hostname,
@@ -108,7 +109,7 @@ def parse_vless(link: str) -> dict:
     return {"protocol": "vless", "tag": "proxy", "streamSettings": stream, "settings": settings}
 
 
-def parse_vmess(link: str) -> dict:
+def parse_vmess(link: str, sni_override: str = None, allow_insecure_override: bool = False) -> dict:
     raw = link[len("vmess://"):]
     data = json.loads(base64.b64decode(b64pad(raw)))
     net = data.get("net", "tcp")
@@ -126,7 +127,7 @@ def parse_vmess(link: str) -> dict:
         "sni": data.get("sni", data.get("host", "")),
         "fp": data.get("fp", "chrome"),
     }
-    stream = build_stream_settings(net, security, q, data.get("add", ""))
+    stream = build_stream_settings(net, security, q, data.get("add", ""), sni_override, allow_insecure_override)
 
     settings = {
         "address": data["add"],
@@ -138,12 +139,12 @@ def parse_vmess(link: str) -> dict:
     return {"protocol": "vmess", "tag": "proxy", "streamSettings": stream, "settings": settings}
 
 
-def parse_trojan(link: str) -> dict:
+def parse_trojan(link: str, sni_override: str = None, allow_insecure_override: bool = False) -> dict:
     u = urlparse(link)
     q = {k: v[0] for k, v in parse_qs(u.query).items()}
     security = q.get("security", "tls")
     method_raw = q.get("type", "tcp")
-    stream = build_stream_settings(method_raw, security, q, u.hostname)
+    stream = build_stream_settings(method_raw, security, q, u.hostname, sni_override, allow_insecure_override)
 
     settings = {
         "address": u.hostname,
@@ -187,12 +188,14 @@ def parse_ss(link: str) -> dict:
 PARSERS = {"vless": parse_vless, "vmess": parse_vmess, "trojan": parse_trojan, "ss": parse_ss}
 
 
-def parse_link(link: str) -> dict:
+def parse_link(link: str, sni_override: str = None, allow_insecure_override: bool = False) -> dict:
     link = link.strip()
     scheme = link.split("://", 1)[0].lower()
     if scheme not in PARSERS:
         raise ValueError(f"Unsupported scheme: {scheme}")
-    return PARSERS[scheme](link)
+    if scheme == "ss":
+        return parse_ss(link)  # shadowsocks outbound has no TLS/SNI settings in this schema
+    return PARSERS[scheme](link, sni_override, allow_insecure_override)
 
 
 def build_config(outbounds: list, extra_direct_domains=None, use_tun=True) -> dict:
@@ -258,6 +261,12 @@ def main():
     ap.add_argument("--no-tun", action="store_true",
                      help="Skip the TUN inbound — generate a plain socks(10808)/http(10809) config "
                           "that needs no admin rights.")
+    ap.add_argument("--sni", default=None,
+                     help="Override the SNI/serverName for every TLS or REALITY link, "
+                          "regardless of what the link itself specifies.")
+    ap.add_argument("--allow-insecure", action="store_true",
+                     help="Force allowInsecure=true (skip TLS certificate verification) on every "
+                          "TLS link. Use only for self-signed certs / testing — this permits MITM.")
     args = ap.parse_args()
 
     links = []
@@ -272,7 +281,7 @@ def main():
     outbounds = []
     for i, link in enumerate(links):
         try:
-            ob = parse_link(link)
+            ob = parse_link(link, sni_override=args.sni, allow_insecure_override=args.allow_insecure)
         except Exception as e:
             print(f"Warning: skipping link #{i+1} ({e})", file=sys.stderr)
             continue
