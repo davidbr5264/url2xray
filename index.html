@@ -139,6 +139,9 @@
   .adv-group{margin-top:18px;padding-top:16px;border-top:1px dashed var(--border);}
   .adv-group:first-of-type{border-top:none;padding-top:14px;}
   .adv-label{font-family:var(--mono);font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
+  .domain-preview{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;min-height:0;}
+  .domain-pill{font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);color:var(--sub);}
+  .domain-pill.warn{color:var(--red);border-color:rgba(229,72,77,.4);}
 
   pre#output{
     background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;
@@ -337,10 +340,19 @@ trojan://password@server2.example.com:443?security=tls&type=ws&host=cdn.example.
       </div>
 
       <div class="adv-group">
-        <div class="adv-label">Custom domain routing (optional, one domain/geosite tag per line)</div>
+        <div class="adv-label">Custom domain routing (optional — one entry per line, or comma-separated)</div>
+        <div class="step-hint" style="margin:0 0 10px;">Paste bare domains (<code>example.com</code>), or prefixed matchers (<code>domain:</code>/<code>full:</code>/<code>keyword:</code>/<code>regexp:</code>/<code>geosite:</code>). Full URLs like <code>https://example.com/</code> are auto-cleaned to just the hostname — domain routing matches against sniffed SNI/Host values, which never include a scheme or path.</div>
         <div class="grid">
-          <div class="field"><label>Always via proxy — e.g. <code>domain:example.com</code>, <code>geosite:netflix</code></label><textarea id="customProxyDomains" style="min-height:70px;"></textarea></div>
-          <div class="field"><label>Always direct — e.g. <code>domain:example.com</code>, <code>geosite:cn</code></label><textarea id="customDirectDomains" style="min-height:70px;"></textarea></div>
+          <div class="field">
+            <label>Always via proxy</label>
+            <textarea id="customProxyDomains" style="min-height:70px;"></textarea>
+            <div class="domain-preview" id="customProxyDomainsPreview"></div>
+          </div>
+          <div class="field">
+            <label>Always direct</label>
+            <textarea id="customDirectDomains" style="min-height:70px;"></textarea>
+            <div class="domain-preview" id="customDirectDomainsPreview"></div>
+          </div>
         </div>
       </div>
     </details>
@@ -863,6 +875,38 @@ function renderServerList(){
 
 function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+// Custom domain routing entries: current xray-core domain matchers only ever compare against a bare
+// hostname (sniffed SNI/Host), so a pasted full URL like "https://example.com/path" would never match
+// anything — silently making the rule a no-op. Strip scheme/path/query for anything not already using
+// one of xray's own prefixes, and accept comma OR newline as a separator (comma is what the DNS-servers
+// field above uses, so people reasonably paste comma lists here too).
+const KNOWN_DOMAIN_PREFIX = /^(domain:|full:|regexp:|keyword:|geosite:)/i;
+function sanitizeDomainEntry(raw){
+  let s = raw.trim();
+  if(!s) return null;
+  if(KNOWN_DOMAIN_PREFIX.test(s)) return s;
+  s = s.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, ''); // strip a URL scheme like https://
+  s = s.split(/[/?#]/)[0]; // strip any path/query/fragment
+  return s.trim();
+}
+function looksMalformed(s){
+  return !s || /\s/.test(s) || s.includes('://') || (KNOWN_DOMAIN_PREFIX.test(s) && s.split(':')[1] === '');
+}
+function parseDomainLines(id){
+  return document.getElementById(id).value
+    .split(/[\n,]+/)
+    .map(sanitizeDomainEntry)
+    .filter(Boolean);
+}
+function renderDomainPreview(fieldId, previewId){
+  const entries = document.getElementById(fieldId).value.split(/[\n,]+/).map(sanitizeDomainEntry).filter(Boolean);
+  const el = document.getElementById(previewId);
+  el.innerHTML = entries.map(e => `<span class="domain-pill${looksMalformed(e) ? ' warn' : ''}">${escapeHtml(e)}</span>`).join('');
+}
+['customProxyDomains','customDirectDomains'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => renderDomainPreview(id, id + 'Preview'));
+});
+
 // mode toggle
 document.getElementById('modeBtnSocks').addEventListener('click', () => setMode('socks'));
 document.getElementById('modeBtnTun').addEventListener('click', () => setMode('tun'));
@@ -903,7 +947,6 @@ genBtn.addEventListener('click', () => {
   }
 
   const dnsList = document.getElementById('dnsServers').value.split(',').map(s => s.trim()).filter(Boolean);
-  const parseDomainLines = id => document.getElementById(id).value.split('\n').map(s => s.trim()).filter(Boolean);
   const opts = {
     mode: currentMode,
     socksPort: parseInt(document.getElementById('socksPort').value, 10) || 1080,
@@ -961,6 +1004,14 @@ genBtn.addEventListener('click', () => {
   }
   if(server.transport && server.transport.security === 'tls' && server.transport.allowInsecure){
     notes.push('<b>Note:</b> "allowInsecure" is deprecated in current xray-core (moving toward <code>pinnedPeerCertSha256</code>) but is still honored — some newer builds may reject it. If your client fails to start, remove it and pin the certificate instead.');
+  }
+  const hasCustomDomainRules = (opts.customProxyDomains.length || opts.customDirectDomains.length);
+  if(hasCustomDomainRules && !opts.sniffingEnabled){
+    notes.push('<b>Note:</b> sniffing is turned off, but you\'ve set custom domain routing rules. Without sniffing, xray-core only ever sees the raw destination IP for most inbound connections — it can\'t match domain-based rules at all in that case. Turn sniffing back on (under "Traffic sniffing" above) for these rules to take effect.');
+  }
+  const badDomains = [...opts.customProxyDomains, ...opts.customDirectDomains].filter(looksMalformed);
+  if(badDomains.length){
+    notes.push('<b>Note:</b> these custom domain entries still look malformed after cleanup and likely won\'t match anything: ' + badDomains.map(escapeHtml).join(', ') + '. Domain rules match against a bare hostname only (from sniffed SNI/Host) — no scheme, no path, no spaces.');
   }
   if(notes.length) outputWarning.innerHTML = notes.map(n => '<div class="note">' + n + '</div>').join('');
 
