@@ -261,14 +261,49 @@ trojan://password@server2.example.com:443?security=tls&type=ws&host=cdn.example.
       </div>
 
       <div class="adv-group">
-        <div class="adv-label">Inbound authentication</div>
-        <div class="checks">
+        <div class="adv-label">Inbound access &amp; authentication</div>
+        <div class="grid">
+          <div class="field"><label>Listen address (SOCKS &amp; HTTP inbounds)</label>
+            <select id="listenAddress">
+              <option value="127.0.0.1" selected>127.0.0.1 (localhost only)</option>
+              <option value="0.0.0.0">0.0.0.0 (all interfaces / LAN-wide)</option>
+            </select>
+          </div>
+          <div class="field"><label>UDP over SOCKS</label>
+            <select id="socksUdp">
+              <option value="true" selected>enabled</option>
+              <option value="false">disabled</option>
+            </select>
+          </div>
+        </div>
+        <div class="checks" style="margin-top:12px;">
           <label class="check"><input type="checkbox" id="optInboundAuth"> Require a username/password on the local SOCKS &amp; HTTP inbounds instead of open access</label>
         </div>
         <div class="grid" id="inboundAuthFields" style="display:none;margin-top:10px;">
           <div class="field"><label>Username</label><input type="text" id="authUser" value="user"></div>
           <div class="field"><label>Password</label><input type="text" id="authPass" value=""></div>
         </div>
+        <div class="note" id="lanExposureNote" style="display:none;"><b>Heads up:</b> listening on 0.0.0.0 exposes this proxy to your whole LAN (and any network you join) with no password. Turn on the username/password requirement above before using this outside a trusted localhost-only setup.</div>
+      </div>
+
+      <div class="adv-group">
+        <div class="adv-label">TLS / REALITY fingerprint override</div>
+        <div class="grid">
+          <div class="field"><label>Client fingerprint (uTLS)</label>
+            <select id="fpOverride">
+              <option value="" selected>Use whatever the link specifies</option>
+              <option value="chrome">chrome</option>
+              <option value="firefox">firefox</option>
+              <option value="safari">safari</option>
+              <option value="ios">ios</option>
+              <option value="android">android</option>
+              <option value="edge">edge</option>
+              <option value="random">random (one fixed fingerprint per connection, chosen randomly)</option>
+              <option value="randomized">randomized (fully randomized per connection)</option>
+            </select>
+          </div>
+        </div>
+        <div class="step-hint" style="margin:8px 0 0;">Overrides the <code>fingerprint</code> field on both <code>tlsSettings</code> and <code>realitySettings</code> for every server, regardless of what each individual link specified. Useful for making a batch of servers behave consistently, or matching a specific browser's TLS ClientHello shape.</div>
       </div>
 
       <div class="adv-group">
@@ -291,6 +326,7 @@ trojan://password@server2.example.com:443?security=tls&type=ws&host=cdn.example.
 
       <div class="adv-group">
         <div class="adv-label">Fragment (TLS ClientHello fragmentation, anti-censorship)</div>
+
         <div class="checks">
           <label class="check"><input type="checkbox" id="optFragment"> Fragment outgoing TLS handshakes on the direct outbound</label>
         </div>
@@ -564,11 +600,12 @@ function parseAnyLink(link){
 // removed entirely in favor of XHTTP, and mKCP dropped its header/seed fields (now handled
 // by the separate FinalMask layer, which this generator does not attempt to reconstruct
 // from a share-link since there's no established URI convention for it yet).
-function buildStreamSettings(t){
+function buildStreamSettings(t, fpOverride){
+  const fp = fpOverride || t.fp;
   const ss = { network: t.network };
   if(t.security === 'tls'){
     ss.security = 'tls';
-    ss.tlsSettings = { serverName: t.sni, fingerprint: t.fp };
+    ss.tlsSettings = { serverName: t.sni, fingerprint: fp };
     if(t.alpn) ss.tlsSettings.alpn = t.alpn.split(',');
     // allowInsecure is deprecated in current xray-core (migrated toward pinnedPeerCertSha256),
     // but still documented and functional, so only emit it when the link actually asked for it.
@@ -576,7 +613,7 @@ function buildStreamSettings(t){
   } else if(t.security === 'reality'){
     ss.security = 'reality';
     // Client-side REALITY field was renamed publicKey -> password in current xray-core.
-    ss.realitySettings = { serverName: t.sni, fingerprint: t.fp, password: t.pbk, shortId: t.sid || '', spiderX: t.spx || '' };
+    ss.realitySettings = { serverName: t.sni, fingerprint: fp, password: t.pbk, shortId: t.sid || '', spiderX: t.spx || '' };
   } else {
     ss.security = 'none';
   }
@@ -629,7 +666,7 @@ function buildStreamSettings(t){
 // Current xray-core outbound settings are flat single-endpoint objects (address/port/...
 // directly under "settings"), not the old vnext/servers arrays. The core now enforces one
 // endpoint per outbound and expects routing/balancers for multi-server setups.
-function buildOutbound(server, tag){
+function buildOutbound(server, tag, fpOverride){
   switch(server.protocol){
     case 'vless':
       return {
@@ -640,19 +677,19 @@ function buildOutbound(server, tag){
           flow: server.flow || undefined,
           level: 0
         },
-        streamSettings: buildStreamSettings(server.transport)
+        streamSettings: buildStreamSettings(server.transport, fpOverride)
       };
     case 'vmess':
       return {
         protocol: 'vmess', tag,
         settings: { address: server.address, port: server.port, id: server.uuid, security: server.cipher || 'auto', level: 0 },
-        streamSettings: buildStreamSettings(server.transport)
+        streamSettings: buildStreamSettings(server.transport, fpOverride)
       };
     case 'trojan':
       return {
         protocol: 'trojan', tag,
         settings: { address: server.address, port: server.port, password: server.password, level: 0 },
-        streamSettings: buildStreamSettings(server.transport)
+        streamSettings: buildStreamSettings(server.transport, fpOverride)
       };
     case 'shadowsocks':
       return {
@@ -667,7 +704,7 @@ function buildOutbound(server, tag){
         settings: { version: 2, address: server.address, port: server.port },
         streamSettings: {
           network: 'hysteria', security: 'tls',
-          tlsSettings: Object.assign({ serverName: server.sni, alpn: ['h3'] }, server.insecure ? { allowInsecure: true } : {}),
+          tlsSettings: Object.assign({ serverName: server.sni, alpn: ['h3'] }, fpOverride ? { fingerprint: fpOverride } : {}, server.insecure ? { allowInsecure: true } : {}),
           hysteriaSettings: { version: 2, auth: server.auth, udpIdleTimeout: 60 }
         }
       };
@@ -680,7 +717,7 @@ function buildOutbound(server, tag){
 
 // ---------- config assembly ----------
 function buildConfig(server, opts){
-  const outbound = buildOutbound(server, 'proxy');
+  const outbound = buildOutbound(server, 'proxy', opts.fpOverride);
   if(!outbound) throw new Error('unsupported');
 
   // Mux: current xray-core schema is {enabled, concurrency, xudpConcurrency, xudpProxyUDP443}.
@@ -704,7 +741,7 @@ function buildConfig(server, opts){
 
   const inbounds = [];
   if(opts.mode === 'socks'){
-    const socksSettings = { udp: true, ip: '127.0.0.1' };
+    const socksSettings = { udp: opts.socksUdp !== false, ip: '127.0.0.1' };
     const httpSettings = {};
     if(opts.inboundAuth && opts.inboundAuth.enabled){
       socksSettings.auth = 'password';
@@ -713,8 +750,8 @@ function buildConfig(server, opts){
     } else {
       socksSettings.auth = 'noauth';
     }
-    inbounds.push({ tag: 'socks-in', listen: '127.0.0.1', port: opts.socksPort, protocol: 'socks', settings: socksSettings, sniffing });
-    inbounds.push({ tag: 'http-in', listen: '127.0.0.1', port: opts.httpPort, protocol: 'http', settings: httpSettings, sniffing });
+    inbounds.push({ tag: 'socks-in', listen: opts.listenAddress || '127.0.0.1', port: opts.socksPort, protocol: 'socks', settings: socksSettings, sniffing });
+    inbounds.push({ tag: 'http-in', listen: opts.listenAddress || '127.0.0.1', port: opts.httpPort, protocol: 'http', settings: httpSettings, sniffing });
   } else {
     const gateway = [opts.tunGw4, opts.tunGw6].filter(Boolean);
     const tunSettings = { name: opts.tunName || 'xray0', mtu: opts.tunMtu || 1500 };
@@ -930,6 +967,13 @@ document.getElementById('optMux').addEventListener('change', e => {
 document.getElementById('optFragment').addEventListener('change', e => {
   document.getElementById('fragmentFields').style.display = e.target.checked ? '' : 'none';
 });
+function updateLanExposureNote(){
+  const lan = document.getElementById('listenAddress').value === '0.0.0.0';
+  const authed = document.getElementById('optInboundAuth').checked;
+  document.getElementById('lanExposureNote').style.display = (lan && !authed) ? '' : 'none';
+}
+document.getElementById('listenAddress').addEventListener('change', updateLanExposureNote);
+document.getElementById('optInboundAuth').addEventListener('change', updateLanExposureNote);
 function updateMuxVisionNote(){
   const server = parsedServers.find(s => s.id === selectedId);
   const isVision = server && server.flow === 'xtls-rprx-vision';
@@ -985,7 +1029,10 @@ genBtn.addEventListener('click', () => {
     routingDomainStrategy: document.getElementById('routingDomainStrategy').value,
     freedomDomainStrategy: document.getElementById('freedomDomainStrategy').value,
     customProxyDomains: parseDomainLines('customProxyDomains'),
-    customDirectDomains: parseDomainLines('customDirectDomains')
+    customDirectDomains: parseDomainLines('customDirectDomains'),
+    listenAddress: document.getElementById('listenAddress').value,
+    socksUdp: document.getElementById('socksUdp').value === 'true',
+    fpOverride: document.getElementById('fpOverride').value || ''
   };
 
   let cfg;
@@ -1004,6 +1051,9 @@ genBtn.addEventListener('click', () => {
   }
   if(server.transport && server.transport.security === 'tls' && server.transport.allowInsecure){
     notes.push('<b>Note:</b> "allowInsecure" is deprecated in current xray-core (moving toward <code>pinnedPeerCertSha256</code>) but is still honored — some newer builds may reject it. If your client fails to start, remove it and pin the certificate instead.');
+  }
+  if(opts.listenAddress === '0.0.0.0' && !(opts.inboundAuth && opts.inboundAuth.enabled)){
+    notes.push('<b>Note:</b> the SOCKS/HTTP inbounds are set to listen on 0.0.0.0 (all interfaces) with no username/password required. Anyone on your LAN — or any network this device joins — can use this proxy freely. Turn on inbound authentication if that\'s not intended.');
   }
   const hasCustomDomainRules = (opts.customProxyDomains.length || opts.customDirectDomains.length);
   if(hasCustomDomainRules && !opts.sniffingEnabled){
