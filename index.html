@@ -127,6 +127,19 @@
   .check{display:flex;align-items:center;gap:8px;font-size:13px;}
   .check input{accent-color:var(--teal);}
 
+  details.adv{margin-top:18px;border-top:1px solid var(--border);padding-top:14px;}
+  details.adv summary{
+    cursor:pointer;font-family:var(--mono);font-size:12.5px;color:var(--teal);
+    text-transform:uppercase;letter-spacing:.05em;font-weight:700;list-style:none;
+    display:flex;align-items:center;gap:6px;
+  }
+  details.adv summary::-webkit-details-marker{display:none;}
+  details.adv summary::before{content:'▸';transition:transform .15s;}
+  details.adv[open] summary::before{transform:rotate(90deg);}
+  .adv-group{margin-top:18px;padding-top:16px;border-top:1px dashed var(--border);}
+  .adv-group:first-of-type{border-top:none;padding-top:14px;}
+  .adv-label{font-family:var(--mono);font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
+
   pre#output{
     background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;
     font-family:var(--mono);font-size:12.5px;line-height:1.55;overflow:auto;max-height:520px;
@@ -231,6 +244,106 @@ trojan://password@server2.example.com:443?security=tls&type=ws&host=cdn.example.
         </select>
       </div>
     </div>
+
+    <details class="adv">
+      <summary>Advanced options</summary>
+
+      <div class="adv-group">
+        <div class="adv-label">Traffic sniffing (inbound)</div>
+        <div class="checks">
+          <label class="check"><input type="checkbox" id="optSniffing" checked> Enable sniffing (reads SNI/Host from the first packet so routing/logs see the real domain)</label>
+          <label class="check"><input type="checkbox" id="optRouteOnly"> Route-only mode — use the sniffed domain for routing decisions only, keep proxying to the original IP (<code>routeOnly</code>)</label>
+          <label class="check"><input type="checkbox" id="optFakeDns"> Enable FakeDNS — hand out fake IPs locally so routing can match by domain without a real DNS round-trip first (useful with TUN)</label>
+        </div>
+      </div>
+
+      <div class="adv-group">
+        <div class="adv-label">Inbound authentication</div>
+        <div class="checks">
+          <label class="check"><input type="checkbox" id="optInboundAuth"> Require a username/password on the local SOCKS &amp; HTTP inbounds instead of open access</label>
+        </div>
+        <div class="grid" id="inboundAuthFields" style="display:none;margin-top:10px;">
+          <div class="field"><label>Username</label><input type="text" id="authUser" value="user"></div>
+          <div class="field"><label>Password</label><input type="text" id="authPass" value=""></div>
+        </div>
+      </div>
+
+      <div class="adv-group">
+        <div class="adv-label">Mux (connection multiplexing)</div>
+        <div class="checks">
+          <label class="check"><input type="checkbox" id="optMux"> Enable Mux on the proxy outbound</label>
+        </div>
+        <div class="grid" id="muxFields" style="display:none;margin-top:10px;">
+          <div class="field"><label>Concurrency (1–128)</label><input type="number" id="muxConcurrency" value="8" min="1" max="128"></div>
+          <div class="field"><label>UDP/443 (QUIC) handling</label>
+            <select id="muxXudp443">
+              <option value="reject" selected>reject (default — forces QUIC to fall back to TCP)</option>
+              <option value="allow">allow</option>
+              <option value="skip">skip</option>
+            </select>
+          </div>
+        </div>
+        <div class="note" id="muxVisionNote" style="display:none;"><b>Heads up:</b> this server uses XTLS Vision flow, which is generally recommended to run <i>without</i> Mux (Mux breaks Vision's direct TCP splicing). Consider leaving this off unless you know you need it.</div>
+      </div>
+
+      <div class="adv-group">
+        <div class="adv-label">Fragment (TLS ClientHello fragmentation, anti-censorship)</div>
+        <div class="checks">
+          <label class="check"><input type="checkbox" id="optFragment"> Fragment outgoing TLS handshakes on the direct outbound</label>
+        </div>
+        <div class="grid" id="fragmentFields" style="display:none;margin-top:10px;">
+          <div class="field"><label>Packets</label><input type="text" id="fragPackets" value="tlshello"></div>
+          <div class="field"><label>Length</label><input type="text" id="fragLength" value="100-200"></div>
+          <div class="field"><label>Interval (ms)</label><input type="text" id="fragInterval" value="10-20"></div>
+        </div>
+      </div>
+
+      <div class="adv-group">
+        <div class="adv-label">DNS &amp; routing strategy</div>
+        <div class="grid">
+          <div class="field"><label>DNS query strategy</label>
+            <select id="dnsQueryStrategy">
+              <option value="" selected>(default)</option>
+              <option value="UseIP">UseIP</option>
+              <option value="UseIPv4">UseIPv4</option>
+              <option value="UseIPv6">UseIPv6</option>
+            </select>
+          </div>
+          <div class="field"><label>Routing domain strategy</label>
+            <select id="routingDomainStrategy">
+              <option value="IPIfNonMatch" selected>IPIfNonMatch</option>
+              <option value="AsIs">AsIs</option>
+              <option value="IPOnDemand">IPOnDemand</option>
+            </select>
+          </div>
+          <div class="field"><label>Freedom (direct) outbound resolution</label>
+            <select id="freedomDomainStrategy">
+              <option value="UseIP" selected>UseIP</option>
+              <option value="AsIs">AsIs</option>
+              <option value="UseIPv4">UseIPv4</option>
+              <option value="UseIPv6">UseIPv6</option>
+              <option value="ForceIP">ForceIP</option>
+              <option value="ForceIPv4">ForceIPv4</option>
+              <option value="ForceIPv6">ForceIPv6</option>
+            </select>
+          </div>
+          <div class="field"><label>DNS cache</label>
+            <select id="dnsDisableCache">
+              <option value="false" selected>enabled (default)</option>
+              <option value="true">disabled</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="adv-group">
+        <div class="adv-label">Custom domain routing (optional, one domain/geosite tag per line)</div>
+        <div class="grid">
+          <div class="field"><label>Always via proxy — e.g. <code>domain:example.com</code>, <code>geosite:netflix</code></label><textarea id="customProxyDomains" style="min-height:70px;"></textarea></div>
+          <div class="field"><label>Always direct — e.g. <code>domain:example.com</code>, <code>geosite:cn</code></label><textarea id="customDirectDomains" style="min-height:70px;"></textarea></div>
+        </div>
+      </div>
+    </details>
   </section>
 
   <!-- STEP 4: OUTPUT -->
@@ -558,17 +671,38 @@ function buildConfig(server, opts){
   const outbound = buildOutbound(server, 'proxy');
   if(!outbound) throw new Error('unsupported');
 
+  // Mux: current xray-core schema is {enabled, concurrency, xudpConcurrency, xudpProxyUDP443}.
+  // Concurrency < 0 fully disables mux even if enabled:true, so we only attach the object at all when requested.
+  if(opts.mux && opts.mux.enabled){
+    outbound.mux = {
+      enabled: true,
+      concurrency: opts.mux.concurrency || 8,
+      xudpConcurrency: 8,
+      xudpProxyUDP443: opts.mux.xudpProxyUDP443 || 'reject'
+    };
+  }
+
+  const destOverride = ['http', 'tls', 'quic'];
+  if(opts.fakeDns) destOverride.push('fakedns');
+  const sniffing = {
+    enabled: opts.sniffingEnabled !== false,
+    destOverride,
+    routeOnly: !!opts.routeOnly
+  };
+
   const inbounds = [];
   if(opts.mode === 'socks'){
-    inbounds.push({
-      tag: 'socks-in', listen: '127.0.0.1', port: opts.socksPort, protocol: 'socks',
-      settings: { auth: 'noauth', udp: true, ip: '127.0.0.1' },
-      sniffing: { enabled: true, destOverride: ['http','tls','quic'] }
-    });
-    inbounds.push({
-      tag: 'http-in', listen: '127.0.0.1', port: opts.httpPort, protocol: 'http',
-      settings: {}
-    });
+    const socksSettings = { udp: true, ip: '127.0.0.1' };
+    const httpSettings = {};
+    if(opts.inboundAuth && opts.inboundAuth.enabled){
+      socksSettings.auth = 'password';
+      socksSettings.accounts = [{ user: opts.inboundAuth.user, pass: opts.inboundAuth.pass }];
+      httpSettings.accounts = [{ user: opts.inboundAuth.user, pass: opts.inboundAuth.pass }];
+    } else {
+      socksSettings.auth = 'noauth';
+    }
+    inbounds.push({ tag: 'socks-in', listen: '127.0.0.1', port: opts.socksPort, protocol: 'socks', settings: socksSettings, sniffing });
+    inbounds.push({ tag: 'http-in', listen: '127.0.0.1', port: opts.httpPort, protocol: 'http', settings: httpSettings, sniffing });
   } else {
     const gateway = [opts.tunGw4, opts.tunGw6].filter(Boolean);
     const tunSettings = { name: opts.tunName || 'xray0', mtu: opts.tunMtu || 1500 };
@@ -576,27 +710,40 @@ function buildConfig(server, opts){
     if(opts.dnsList.length) tunSettings.dns = opts.dnsList;
     if(opts.tunAutoRoute) tunSettings.autoSystemRoutingTable = ['0.0.0.0/0', '::/0'];
     if(opts.tunAutoIface) tunSettings.autoOutboundsInterface = 'auto';
-    inbounds.push({
-      tag: 'tun-in', protocol: 'tun', settings: tunSettings,
-      sniffing: { enabled: true, destOverride: ['http','tls','quic'] }
-    });
+    inbounds.push({ tag: 'tun-in', protocol: 'tun', settings: tunSettings, sniffing });
   }
 
   const rules = [];
-  rules.push({ type: 'field', outboundTag: 'direct', process: ['self/', 'xray/'] });
   if(opts.bypassPrivate) rules.push({ type: 'field', ip: ['geoip:private'], outboundTag: 'direct' });
+  if(opts.customProxyDomains && opts.customProxyDomains.length) rules.push({ type: 'field', domain: opts.customProxyDomains, outboundTag: 'proxy' });
+  if(opts.customDirectDomains && opts.customDirectDomains.length) rules.push({ type: 'field', domain: opts.customDirectDomains, outboundTag: 'direct' });
   if(opts.blockAds) rules.push({ type: 'field', domain: ['geosite:category-ads-all'], outboundTag: 'block' });
+
+  const dnsServers = opts.dnsList.length ? [...opts.dnsList] : ['1.1.1.1', 'localhost'];
+  if(opts.fakeDns) dnsServers.unshift('fakedns');
+  const dns = { servers: dnsServers };
+  if(opts.dnsQueryStrategy) dns.queryStrategy = opts.dnsQueryStrategy;
+  if(opts.dnsDisableCache) dns.disableCache = true;
+
+  const directSettings = { domainStrategy: opts.freedomDomainStrategy || 'UseIP' };
+  if(opts.fragment && opts.fragment.enabled){
+    directSettings.fragment = {
+      packets: opts.fragment.packets || 'tlshello',
+      length: opts.fragment.length || '100-200',
+      interval: opts.fragment.interval || '10-20'
+    };
+  }
 
   return {
     log: { loglevel: opts.logLevel },
-    dns: { servers: opts.dnsList.length ? opts.dnsList : ['1.1.1.1', 'localhost'] },
+    dns,
     inbounds,
     outbounds: [
       outbound,
-      { tag: 'direct', protocol: 'freedom', settings: { domainStrategy: 'UseIP' } },
+      { tag: 'direct', protocol: 'freedom', settings: directSettings },
       { tag: 'block', protocol: 'blackhole', settings: {} }
     ],
-    routing: { domainStrategy: 'IPIfNonMatch', rules }
+    routing: { domainStrategy: opts.routingDomainStrategy || 'IPIfNonMatch', rules }
   };
 }
 
@@ -669,6 +816,7 @@ parseBtn.addEventListener('click', () => {
     optionsSection.style.display = '';
     outputSection.style.display = '';
     setFlowStep(3);
+    updateMuxVisionNote();
   } else {
     serversSection.style.display = 'none';
     optionsSection.style.display = 'none';
@@ -708,7 +856,7 @@ function renderServerList(){
         <div class="sub">${escapeHtml(s.address)}:${s.port}${unsupported ? ' — <span class="warn-badge">not supported by xray-core, use sing-box</span>' : ''}</div>
       </div>
     `;
-    div.querySelector('input').addEventListener('change', () => { selectedId = s.id; renderServerList(); });
+    div.querySelector('input').addEventListener('change', () => { selectedId = s.id; renderServerList(); updateMuxVisionNote(); });
     serverList.appendChild(div);
   });
 }
@@ -727,6 +875,24 @@ function setMode(mode){
 }
 let currentMode = 'socks';
 
+// advanced option show/hide wiring
+document.getElementById('optInboundAuth').addEventListener('change', e => {
+  document.getElementById('inboundAuthFields').style.display = e.target.checked ? '' : 'none';
+});
+document.getElementById('optMux').addEventListener('change', e => {
+  document.getElementById('muxFields').style.display = e.target.checked ? '' : 'none';
+  updateMuxVisionNote();
+});
+document.getElementById('optFragment').addEventListener('change', e => {
+  document.getElementById('fragmentFields').style.display = e.target.checked ? '' : 'none';
+});
+function updateMuxVisionNote(){
+  const server = parsedServers.find(s => s.id === selectedId);
+  const isVision = server && server.flow === 'xtls-rprx-vision';
+  const muxOn = document.getElementById('optMux').checked;
+  document.getElementById('muxVisionNote').style.display = (isVision && muxOn) ? '' : 'none';
+}
+
 genBtn.addEventListener('click', () => {
   const server = parsedServers.find(s => s.id === selectedId);
   outputWarning.innerHTML = '';
@@ -737,6 +903,7 @@ genBtn.addEventListener('click', () => {
   }
 
   const dnsList = document.getElementById('dnsServers').value.split(',').map(s => s.trim()).filter(Boolean);
+  const parseDomainLines = id => document.getElementById(id).value.split('\n').map(s => s.trim()).filter(Boolean);
   const opts = {
     mode: currentMode,
     socksPort: parseInt(document.getElementById('socksPort').value, 10) || 1080,
@@ -750,7 +917,32 @@ genBtn.addEventListener('click', () => {
     bypassPrivate: document.getElementById('optBypassPrivate').checked,
     blockAds: document.getElementById('optBlockAds').checked,
     dnsList,
-    logLevel: document.getElementById('logLevel').value
+    logLevel: document.getElementById('logLevel').value,
+    sniffingEnabled: document.getElementById('optSniffing').checked,
+    routeOnly: document.getElementById('optRouteOnly').checked,
+    fakeDns: document.getElementById('optFakeDns').checked,
+    inboundAuth: {
+      enabled: document.getElementById('optInboundAuth').checked,
+      user: document.getElementById('authUser').value.trim() || 'user',
+      pass: document.getElementById('authPass').value
+    },
+    mux: {
+      enabled: document.getElementById('optMux').checked,
+      concurrency: parseInt(document.getElementById('muxConcurrency').value, 10) || 8,
+      xudpProxyUDP443: document.getElementById('muxXudp443').value
+    },
+    fragment: {
+      enabled: document.getElementById('optFragment').checked,
+      packets: document.getElementById('fragPackets').value.trim(),
+      length: document.getElementById('fragLength').value.trim(),
+      interval: document.getElementById('fragInterval').value.trim()
+    },
+    dnsQueryStrategy: document.getElementById('dnsQueryStrategy').value,
+    dnsDisableCache: document.getElementById('dnsDisableCache').value === 'true',
+    routingDomainStrategy: document.getElementById('routingDomainStrategy').value,
+    freedomDomainStrategy: document.getElementById('freedomDomainStrategy').value,
+    customProxyDomains: parseDomainLines('customProxyDomains'),
+    customDirectDomains: parseDomainLines('customDirectDomains')
   };
 
   let cfg;
