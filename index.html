@@ -236,7 +236,10 @@ trojan://password@server2.example.com:443?security=tls&type=ws&host=cdn.example.
     </div>
 
     <div class="grid" style="margin-top:14px;">
-      <div class="field"><label>DNS servers</label><input type="text" id="dnsServers" value="1.1.1.1, 8.8.8.8"></div>
+      <div class="field">
+        <label>DNS servers</label>
+        <input type="text" id="dnsServers" value="https://1.1.1.1/dns-query, https://dns.google/dns-query">
+      </div>
       <div class="field"><label>Log level</label>
         <select id="logLevel">
           <option value="warning" selected>warning</option>
@@ -246,6 +249,9 @@ trojan://password@server2.example.com:443?security=tls&type=ws&host=cdn.example.
           <option value="debug">debug</option>
         </select>
       </div>
+    </div>
+    <div class="checks" style="margin-top:10px;">
+      <label class="check"><input type="checkbox" id="optBlockDns53" checked> Block direct port-53 DNS (prevents apps/OS from leaking plaintext DNS queries around the tunnel — local LAN DNS servers stay reachable)</label>
     </div>
 
     <details class="adv">
@@ -287,7 +293,7 @@ trojan://password@server2.example.com:443?security=tls&type=ws&host=cdn.example.
       </div>
 
       <div class="adv-group">
-        <div class="adv-label">TLS / REALITY fingerprint override</div>
+        <div class="adv-label">TLS / REALITY security</div>
         <div class="grid">
           <div class="field"><label>Client fingerprint (uTLS)</label>
             <select id="fpOverride">
@@ -304,6 +310,15 @@ trojan://password@server2.example.com:443?security=tls&type=ws&host=cdn.example.
           </div>
         </div>
         <div class="step-hint" style="margin:8px 0 0;">Overrides the <code>fingerprint</code> field on both <code>tlsSettings</code> and <code>realitySettings</code> for every server, regardless of what each individual link specified. Useful for making a batch of servers behave consistently, or matching a specific browser's TLS ClientHello shape.</div>
+
+        <div class="grid" style="margin-top:14px;">
+          <div class="field"><label>Pinned certificate SHA256 (optional, TLS only)</label><input type="text" id="certPin" placeholder="base64 hash, or multiple joined with ~"></div>
+          <div class="field"><label>ECH config (optional, TLS only)</label><input type="text" id="echConfig" placeholder="fixed ECHConfig string, or e.g. https://1.1.1.1/dns-query"></div>
+        </div>
+        <div class="step-hint" style="margin:8px 0 0;">
+          <b>Cert pinning</b> replaces normal certificate-chain trust with an exact match against this hash — get it with <code>xray tls hash --cert &lt;cert.pem&gt;</code>, <code>xray tls ping &lt;host:port&gt;</code>, or <code>openssl x509 -noout -fingerprint -sha256 -in cert.pem</code>. Stronger than <code>allowInsecure</code> since it still refuses anything that isn't <i>this exact</i> certificate, rather than accepting anything.<br>
+          <b>ECH</b> hides the SNI from network-level observers (deeper than REALITY's camouflage, which still leaks the disguise domain in plaintext at the TCP/TLS layer for some analysis methods). Only applies to plain TLS security, not REALITY — REALITY already has its own SNI-camouflage mechanism.
+        </div>
       </div>
 
       <div class="adv-group">
@@ -600,7 +615,7 @@ function parseAnyLink(link){
 // removed entirely in favor of XHTTP, and mKCP dropped its header/seed fields (now handled
 // by the separate FinalMask layer, which this generator does not attempt to reconstruct
 // from a share-link since there's no established URI convention for it yet).
-function buildStreamSettings(t, fpOverride){
+function buildStreamSettings(t, fpOverride, tlsExtra){
   const fp = fpOverride || t.fp;
   const ss = { network: t.network };
   if(t.security === 'tls'){
@@ -610,6 +625,8 @@ function buildStreamSettings(t, fpOverride){
     // allowInsecure is deprecated in current xray-core (migrated toward pinnedPeerCertSha256),
     // but still documented and functional, so only emit it when the link actually asked for it.
     if(t.allowInsecure) ss.tlsSettings.allowInsecure = true;
+    if(tlsExtra && tlsExtra.pinnedPeerCertSha256) ss.tlsSettings.pinnedPeerCertSha256 = tlsExtra.pinnedPeerCertSha256;
+    if(tlsExtra && tlsExtra.echConfigList) ss.tlsSettings.echConfigList = tlsExtra.echConfigList;
   } else if(t.security === 'reality'){
     ss.security = 'reality';
     // Client-side REALITY field was renamed publicKey -> password in current xray-core.
@@ -666,7 +683,7 @@ function buildStreamSettings(t, fpOverride){
 // Current xray-core outbound settings are flat single-endpoint objects (address/port/...
 // directly under "settings"), not the old vnext/servers arrays. The core now enforces one
 // endpoint per outbound and expects routing/balancers for multi-server setups.
-function buildOutbound(server, tag, fpOverride){
+function buildOutbound(server, tag, fpOverride, tlsExtra){
   switch(server.protocol){
     case 'vless':
       return {
@@ -677,19 +694,19 @@ function buildOutbound(server, tag, fpOverride){
           flow: server.flow || undefined,
           level: 0
         },
-        streamSettings: buildStreamSettings(server.transport, fpOverride)
+        streamSettings: buildStreamSettings(server.transport, fpOverride, tlsExtra)
       };
     case 'vmess':
       return {
         protocol: 'vmess', tag,
         settings: { address: server.address, port: server.port, id: server.uuid, security: server.cipher || 'auto', level: 0 },
-        streamSettings: buildStreamSettings(server.transport, fpOverride)
+        streamSettings: buildStreamSettings(server.transport, fpOverride, tlsExtra)
       };
     case 'trojan':
       return {
         protocol: 'trojan', tag,
         settings: { address: server.address, port: server.port, password: server.password, level: 0 },
-        streamSettings: buildStreamSettings(server.transport, fpOverride)
+        streamSettings: buildStreamSettings(server.transport, fpOverride, tlsExtra)
       };
     case 'shadowsocks':
       return {
@@ -704,7 +721,13 @@ function buildOutbound(server, tag, fpOverride){
         settings: { version: 2, address: server.address, port: server.port },
         streamSettings: {
           network: 'hysteria', security: 'tls',
-          tlsSettings: Object.assign({ serverName: server.sni, alpn: ['h3'] }, fpOverride ? { fingerprint: fpOverride } : {}, server.insecure ? { allowInsecure: true } : {}),
+          tlsSettings: Object.assign(
+            { serverName: server.sni, alpn: ['h3'] },
+            fpOverride ? { fingerprint: fpOverride } : {},
+            server.insecure ? { allowInsecure: true } : {},
+            (tlsExtra && tlsExtra.pinnedPeerCertSha256) ? { pinnedPeerCertSha256: tlsExtra.pinnedPeerCertSha256 } : {},
+            (tlsExtra && tlsExtra.echConfigList) ? { echConfigList: tlsExtra.echConfigList } : {}
+          ),
           hysteriaSettings: { version: 2, auth: server.auth, udpIdleTimeout: 60 }
         }
       };
@@ -717,7 +740,7 @@ function buildOutbound(server, tag, fpOverride){
 
 // ---------- config assembly ----------
 function buildConfig(server, opts){
-  const outbound = buildOutbound(server, 'proxy', opts.fpOverride);
+  const outbound = buildOutbound(server, 'proxy', opts.fpOverride, { pinnedPeerCertSha256: opts.certPin, echConfigList: opts.echConfig });
   if(!outbound) throw new Error('unsupported');
 
   // Mux: current xray-core schema is {enabled, concurrency, xudpConcurrency, xudpProxyUDP443}.
@@ -764,6 +787,10 @@ function buildConfig(server, opts){
 
   const rules = [];
   if(opts.bypassPrivate) rules.push({ type: 'field', ip: ['geoip:private'], outboundTag: 'direct' });
+  // DNS leak protection: block anything trying to speak raw DNS on port 53 (bypassing xray's own
+  // configured resolver above) rather than allowing it through unencrypted. geoip:private already
+  // matched above, so LAN-local DNS servers stay reachable.
+  if(opts.blockDns53) rules.push({ type: 'field', port: '53', network: 'udp,tcp', outboundTag: 'block' });
   if(opts.customProxyDomains && opts.customProxyDomains.length) rules.push({ type: 'field', domain: opts.customProxyDomains, outboundTag: 'proxy' });
   if(opts.customDirectDomains && opts.customDirectDomains.length) rules.push({ type: 'field', domain: opts.customDirectDomains, outboundTag: 'direct' });
   if(opts.blockAds) rules.push({ type: 'field', domain: ['geosite:category-ads-all'], outboundTag: 'block' });
@@ -1032,7 +1059,10 @@ genBtn.addEventListener('click', () => {
     customDirectDomains: parseDomainLines('customDirectDomains'),
     listenAddress: document.getElementById('listenAddress').value,
     socksUdp: document.getElementById('socksUdp').value === 'true',
-    fpOverride: document.getElementById('fpOverride').value || ''
+    fpOverride: document.getElementById('fpOverride').value || '',
+    certPin: document.getElementById('certPin').value.trim(),
+    echConfig: document.getElementById('echConfig').value.trim(),
+    blockDns53: document.getElementById('optBlockDns53').checked
   };
 
   let cfg;
@@ -1054,6 +1084,13 @@ genBtn.addEventListener('click', () => {
   }
   if(opts.listenAddress === '0.0.0.0' && !(opts.inboundAuth && opts.inboundAuth.enabled)){
     notes.push('<b>Note:</b> the SOCKS/HTTP inbounds are set to listen on 0.0.0.0 (all interfaces) with no username/password required. Anyone on your LAN — or any network this device joins — can use this proxy freely. Turn on inbound authentication if that\'s not intended.');
+  }
+  const plaintextDns = opts.dnsList.filter(s => !/^https:\/\/|^tls:\/\//.test(s) && s !== 'localhost' && s !== 'fakedns');
+  if(plaintextDns.length){
+    notes.push('<b>Note:</b> these DNS servers are plaintext, unencrypted UDP (' + plaintextDns.map(escapeHtml).join(', ') + ') — queries to them can be observed or tampered with by anything between this device and the resolver. Prefer DNS-over-HTTPS (<code>https://1.1.1.1/dns-query</code>) or DNS-over-TLS (<code>tls://1.1.1.1</code>) instead.');
+  }
+  if((opts.certPin || opts.echConfig) && server.transport && server.transport.security !== 'tls' && server.protocol !== 'hysteria'){
+    notes.push('<b>Note:</b> certificate pinning and ECH only apply to plain TLS security — this server uses "' + (server.transport ? server.transport.security : 'none') + '", so those fields were not added to the generated config.');
   }
   const hasCustomDomainRules = (opts.customProxyDomains.length || opts.customDirectDomains.length);
   if(hasCustomDomainRules && !opts.sniffingEnabled){
