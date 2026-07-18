@@ -768,8 +768,11 @@ function buildConfig(server, opts){
     const httpSettings = {};
     if(opts.inboundAuth && opts.inboundAuth.enabled){
       socksSettings.auth = 'password';
-      socksSettings.accounts = [{ user: opts.inboundAuth.user, pass: opts.inboundAuth.pass }];
-      httpSettings.accounts = [{ user: opts.inboundAuth.user, pass: opts.inboundAuth.pass }];
+      // NOTE: the correct field name here is "users", not "accounts" — using "accounts" is a
+      // real, confirmed community pitfall (XTLS/Xray-core#4487, #5943): the config still parses
+      // fine, but xray-core silently ignores the block and the inbound stays wide open.
+      socksSettings.users = [{ user: opts.inboundAuth.user, pass: opts.inboundAuth.pass }];
+      httpSettings.users = [{ user: opts.inboundAuth.user, pass: opts.inboundAuth.pass }];
     } else {
       socksSettings.auth = 'noauth';
     }
