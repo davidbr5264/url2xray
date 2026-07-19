@@ -185,6 +185,18 @@ trojan://password@server2.example.com:443?security=tls&type=ws&host=cdn.example.
       <span id="parseSummary" style="font-family:var(--mono);font-size:12.5px;color:var(--sub);"></span>
     </div>
     <div id="parseErrors"></div>
+
+    <details class="adv" style="margin-top:22px;">
+      <summary>Import an existing config.json instead</summary>
+      <div class="adv-group" style="border-top:none;padding-top:14px;">
+        <div class="step-hint" style="margin:0 0 10px;">Paste a config.json this tool (or xray-core itself) already produced. It'll pull the active server, inbound mode, and every advanced option back into the form below so you can tweak and re-export. Only the outbound tagged <code>proxy</code> (or the first non-infrastructure outbound) is imported — configs with multiple proxy outbounds/balancers aren't supported yet.</div>
+        <textarea id="configImportInput" style="min-height:100px;" placeholder="Paste config.json here"></textarea>
+        <div class="row">
+          <button class="primary" id="importBtn">Import config.json</button>
+        </div>
+        <div id="importErrors"></div>
+      </div>
+    </details>
   </section>
 
   <!-- STEP 2: PARSED SERVERS -->
@@ -836,6 +848,88 @@ function highlight(json){
     .replace(/:\s*(true|false|null)/g, ': <span class="tok-bool">$1</span>');
 }
 
+// ---------- round-trip import: inverse of buildStreamSettings/buildOutbound ----------
+function transportFromStreamSettings(ss){
+  ss = ss || {};
+  const network = ss.network || 'raw';
+  const security = ss.security || 'none';
+  let sni = '', fp = '', alpn = '', host = '', path = '/', serviceName = '', headerType = 'none', pbk = '', sid = '', spx = '', allowInsecure = false;
+
+  if(security === 'tls' && ss.tlsSettings){
+    sni = ss.tlsSettings.serverName || '';
+    fp = ss.tlsSettings.fingerprint || '';
+    if(Array.isArray(ss.tlsSettings.alpn)) alpn = ss.tlsSettings.alpn.join(',');
+    allowInsecure = !!ss.tlsSettings.allowInsecure;
+  } else if(security === 'reality' && ss.realitySettings){
+    sni = ss.realitySettings.serverName || '';
+    fp = ss.realitySettings.fingerprint || '';
+    pbk = ss.realitySettings.password || ss.realitySettings.publicKey || ''; // accept either current or old field name on import
+    sid = ss.realitySettings.shortId || '';
+    spx = ss.realitySettings.spiderX || '';
+  }
+
+  if((network === 'websocket' || network === 'ws') && ss.wsSettings){
+    path = ss.wsSettings.path || '/';
+    host = (ss.wsSettings.headers && ss.wsSettings.headers.Host) || '';
+  } else if(network === 'grpc' && ss.grpcSettings){
+    serviceName = ss.grpcSettings.serviceName || '';
+  } else if(network === 'xhttp' && ss.xhttpSettings){
+    path = ss.xhttpSettings.path || '/';
+    host = ss.xhttpSettings.host || '';
+  } else if(network === 'httpupgrade' && ss.httpupgradeSettings){
+    path = ss.httpupgradeSettings.path || '/';
+    host = ss.httpupgradeSettings.host || '';
+  } else if((network === 'raw' || network === 'tcp') && ss.rawSettings){
+    const h = ss.rawSettings.header || (ss.tcpSettings && ss.tcpSettings.header);
+    if(h && h.type === 'http'){
+      headerType = 'http';
+      path = (h.request && h.request.path && h.request.path[0]) || '/';
+      host = (h.request && h.request.headers && h.request.headers.Host && h.request.headers.Host[0]) || '';
+    }
+  }
+
+  return { security, network, sni, fp, alpn, host, path, serviceName, headerType, pbk, sid, spx, seed: '', allowInsecure };
+}
+
+function serverFromOutbound(ob){
+  const proto = ob.protocol;
+  const s = ob.settings || {};
+  const ss = ob.streamSettings || {};
+  const base = { id: ++serverIdCounter, raw: '(imported from config.json)' };
+  switch(proto){
+    case 'vless':
+      return Object.assign(base, {
+        protocol: 'vless', remark: 'Imported VLESS — ' + s.address, address: s.address, port: s.port,
+        uuid: s.id, flow: s.flow || '', encryption: s.encryption || 'none', transport: transportFromStreamSettings(ss)
+      });
+    case 'vmess':
+      return Object.assign(base, {
+        protocol: 'vmess', remark: 'Imported VMess — ' + s.address, address: s.address, port: s.port,
+        uuid: s.id, cipher: s.security || 'auto', transport: transportFromStreamSettings(ss)
+      });
+    case 'trojan':
+      return Object.assign(base, {
+        protocol: 'trojan', remark: 'Imported Trojan — ' + s.address, address: s.address, port: s.port,
+        password: s.password, transport: transportFromStreamSettings(ss)
+      });
+    case 'shadowsocks':
+      return Object.assign(base, {
+        protocol: 'shadowsocks', remark: 'Imported Shadowsocks — ' + s.address, address: s.address, port: s.port,
+        method: s.method, password: s.password
+      });
+    case 'hysteria': {
+      const hs = ss.hysteriaSettings || {};
+      const tls = ss.tlsSettings || {};
+      return Object.assign(base, {
+        protocol: 'hysteria', remark: 'Imported Hysteria2 — ' + s.address, address: s.address, port: s.port,
+        auth: hs.auth || '', sni: tls.serverName || s.address, insecure: !!tls.allowInsecure
+      });
+    }
+    default:
+      return null; // e.g. wireguard/socks/http outbounds — not a link protocol this tool round-trips
+  }
+}
+
 // ---------- state ----------
 let parsedServers = [];
 let selectedId = null;
@@ -1127,6 +1221,129 @@ downloadBtn.addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = url; a.download = 'config.json'; a.click();
   URL.revokeObjectURL(url);
+});
+
+// ---------- round-trip config.json import ----------
+function importConfig(cfg){
+  if(!cfg || !Array.isArray(cfg.outbounds)) throw new Error('Not a valid xray-core config: missing an "outbounds" array.');
+  const ob = cfg.outbounds.find(o => o.tag === 'proxy') ||
+             cfg.outbounds.find(o => !['freedom','blackhole','dns'].includes(o.protocol));
+  if(!ob) throw new Error('No proxy outbound found in this config (looked for tag "proxy", or the first non-infrastructure outbound).');
+  const server = serverFromOutbound(ob);
+  if(!server) throw new Error('Outbound protocol "' + ob.protocol + '" isn\'t one this tool can round-trip (supported: vless, vmess, trojan, shadowsocks, hysteria).');
+
+  parsedServers.push(server);
+  selectedId = server.id;
+
+  const inbounds = cfg.inbounds || [];
+  const tunInbound = inbounds.find(i => i.protocol === 'tun');
+  const socksInbound = inbounds.find(i => i.protocol === 'socks');
+  const httpInbound = inbounds.find(i => i.protocol === 'http');
+  const mode = tunInbound ? 'tun' : 'socks';
+
+  if(socksInbound){
+    document.getElementById('socksPort').value = socksInbound.port || 1080;
+    document.getElementById('listenAddress').value = socksInbound.listen === '0.0.0.0' ? '0.0.0.0' : '127.0.0.1';
+    document.getElementById('socksUdp').value = (socksInbound.settings && socksInbound.settings.udp === false) ? 'false' : 'true';
+    const users = socksInbound.settings && socksInbound.settings.users;
+    document.getElementById('optInboundAuth').checked = !!(users && users.length);
+    document.getElementById('authUser').value = (users && users[0] && users[0].user) || 'user';
+    document.getElementById('authPass').value = (users && users[0] && users[0].pass) || '';
+  }
+  if(httpInbound) document.getElementById('httpPort').value = httpInbound.port || 1081;
+  if(tunInbound){
+    const ts = tunInbound.settings || {};
+    document.getElementById('tunName').value = ts.name || 'xray0';
+    document.getElementById('tunMtu').value = ts.mtu || 1500;
+    const gw = ts.gateway || [];
+    document.getElementById('tunGw4').value = gw.find(g => g.indexOf(':') === -1) || '';
+    document.getElementById('tunGw6').value = gw.find(g => g.indexOf(':') !== -1) || '';
+    document.getElementById('tunAutoRoute').checked = !!ts.autoSystemRoutingTable;
+    document.getElementById('tunAutoIface').checked = !!ts.autoOutboundsInterface;
+  }
+  setMode(mode);
+
+  const activeInbound = tunInbound || socksInbound || {};
+  const sniffing = activeInbound.sniffing || {};
+  document.getElementById('optSniffing').checked = sniffing.enabled !== false;
+  document.getElementById('optRouteOnly').checked = !!sniffing.routeOnly;
+  const dnsServersRaw = (cfg.dns && cfg.dns.servers) || [];
+  const fakeDnsOn = (sniffing.destOverride && sniffing.destOverride.includes('fakedns')) || dnsServersRaw.includes('fakedns');
+  document.getElementById('optFakeDns').checked = !!fakeDnsOn;
+  document.getElementById('inboundAuthFields').style.display = document.getElementById('optInboundAuth').checked ? '' : 'none';
+
+  const dns = cfg.dns || {};
+  const dnsServersClean = dnsServersRaw.filter(s => typeof s === 'string' && s !== 'fakedns' && s !== 'localhost');
+  document.getElementById('dnsServers').value = dnsServersClean.join(', ');
+  document.getElementById('dnsQueryStrategy').value = dns.queryStrategy || '';
+  document.getElementById('dnsDisableCache').value = dns.disableCache ? 'true' : 'false';
+  document.getElementById('logLevel').value = (cfg.log && cfg.log.loglevel) || 'warning';
+
+  const routing = cfg.routing || {};
+  document.getElementById('routingDomainStrategy').value = routing.domainStrategy || 'IPIfNonMatch';
+  const rules = routing.rules || [];
+  document.getElementById('optBypassPrivate').checked = rules.some(r => r.outboundTag === 'direct' && Array.isArray(r.ip) && r.ip.includes('geoip:private'));
+  document.getElementById('optBlockDns53').checked = rules.some(r => r.outboundTag === 'block' && String(r.port) === '53');
+  document.getElementById('optBlockAds').checked = rules.some(r => r.outboundTag === 'block' && Array.isArray(r.domain) && r.domain.includes('geosite:category-ads-all'));
+  const proxyDomainRule = rules.find(r => r.outboundTag === 'proxy' && Array.isArray(r.domain));
+  const directDomainRule = rules.find(r => r.outboundTag === 'direct' && Array.isArray(r.domain));
+  document.getElementById('customProxyDomains').value = proxyDomainRule ? proxyDomainRule.domain.join('\n') : '';
+  document.getElementById('customDirectDomains').value = directDomainRule ? directDomainRule.domain.join('\n') : '';
+  renderDomainPreview('customProxyDomains', 'customProxyDomainsPreview');
+  renderDomainPreview('customDirectDomains', 'customDirectDomainsPreview');
+
+  const directOb = cfg.outbounds.find(o => o.protocol === 'freedom');
+  const directSettings = (directOb && directOb.settings) || {};
+  document.getElementById('freedomDomainStrategy').value = directSettings.domainStrategy || 'UseIP';
+  document.getElementById('optFragment').checked = !!directSettings.fragment;
+  if(directSettings.fragment){
+    document.getElementById('fragPackets').value = directSettings.fragment.packets || 'tlshello';
+    document.getElementById('fragLength').value = directSettings.fragment.length || '100-200';
+    document.getElementById('fragInterval').value = directSettings.fragment.interval || '10-20';
+  }
+  document.getElementById('fragmentFields').style.display = document.getElementById('optFragment').checked ? '' : 'none';
+
+  document.getElementById('optMux').checked = !!(ob.mux && ob.mux.enabled);
+  if(ob.mux && ob.mux.enabled){
+    document.getElementById('muxConcurrency').value = ob.mux.concurrency || 8;
+    document.getElementById('muxXudp443').value = ob.mux.xudpProxyUDP443 || 'reject';
+  }
+  document.getElementById('muxFields').style.display = document.getElementById('optMux').checked ? '' : 'none';
+
+  const tlsS = (ob.streamSettings && ob.streamSettings.tlsSettings) || {};
+  document.getElementById('certPin').value = tlsS.pinnedPeerCertSha256 || '';
+  document.getElementById('echConfig').value = tlsS.echConfigList || '';
+  document.getElementById('fpOverride').value = ''; // fingerprint is already baked into the imported server's own transport
+
+  renderServerList();
+  serversSection.style.display = '';
+  optionsSection.style.display = '';
+  outputSection.style.display = '';
+  setFlowStep(3);
+  updateMuxVisionNote();
+  updateLanExposureNote();
+
+  const extraOutbounds = cfg.outbounds.filter(o => o !== ob && !['freedom','blackhole','dns'].includes(o.protocol));
+  return { protocol: ob.protocol, extraOutbounds: extraOutbounds.length };
+}
+
+document.getElementById('importBtn').addEventListener('click', () => {
+  const importErrors = document.getElementById('importErrors');
+  importErrors.innerHTML = '';
+  const raw = document.getElementById('configImportInput').value.trim();
+  if(!raw){ importErrors.innerHTML = '<div class="error-line">Paste a config.json first.</div>'; return; }
+  let cfg;
+  try{ cfg = JSON.parse(raw); }
+  catch(e){ importErrors.innerHTML = '<div class="error-line">Not valid JSON: ' + escapeHtml(e.message) + '</div>'; return; }
+  try{
+    const result = importConfig(cfg);
+    parseSummary.textContent = 'Imported 1 server (' + result.protocol + ') from config.json.';
+    if(result.extraOutbounds > 0){
+      importErrors.innerHTML = '<div class="note">This config had ' + result.extraOutbounds + ' other proxy outbound(s) besides the active one — balancers and multi-server setups aren\'t supported here, so only the active proxy outbound was imported.</div>';
+    }
+  }catch(e){
+    importErrors.innerHTML = '<div class="error-line">' + escapeHtml(e.message) + '</div>';
+  }
 });
 
 setFlowStep(1);
