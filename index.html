@@ -189,10 +189,13 @@ trojan://password@server2.example.com:443?security=tls&type=ws&host=cdn.example.
     <details class="adv" style="margin-top:22px;">
       <summary>Import an existing config.json instead</summary>
       <div class="adv-group" style="border-top:none;padding-top:14px;">
-        <div class="step-hint" style="margin:0 0 10px;">Paste a config.json this tool (or xray-core itself) already produced. It'll pull the active server, inbound mode, and every advanced option back into the form below so you can tweak and re-export. Only the outbound tagged <code>proxy</code> (or the first non-infrastructure outbound) is imported — configs with multiple proxy outbounds/balancers aren't supported yet.</div>
-        <textarea id="configImportInput" style="min-height:100px;" placeholder="Paste config.json here"></textarea>
+        <div class="step-hint" style="margin:0 0 10px;">Upload or paste a config.json this tool (or xray-core itself) already produced. It'll pull the active server, inbound mode, and every advanced option back into the form below so you can tweak and re-export. Only the outbound tagged <code>proxy</code> (or the first non-infrastructure outbound) is imported — configs with multiple proxy outbounds/balancers aren't supported yet.</div>
+        <textarea id="configImportInput" style="min-height:100px;" placeholder="Paste config.json here, or use Upload file below"></textarea>
         <div class="row">
           <button class="primary" id="importBtn">Import config.json</button>
+          <button id="uploadConfigBtn">Upload file…</button>
+          <input type="file" id="configFileInput" accept="application/json,.json" style="display:none;">
+          <span id="uploadedFileName" style="font-family:var(--mono);font-size:12.5px;color:var(--sub);"></span>
         </div>
         <div id="importErrors"></div>
       </div>
@@ -223,8 +226,8 @@ trojan://password@server2.example.com:443?security=tls&type=ws&host=cdn.example.
 
     <div id="socksOptions">
       <div class="grid">
-        <div class="field"><label>SOCKS port</label><input type="number" id="socksPort" value="1080"></div>
-        <div class="field"><label>HTTP port</label><input type="number" id="httpPort" value="1081"></div>
+        <div class="field"><label>SOCKS port</label><input type="number" id="socksPort" value="10809"></div>
+        <div class="field"><label>HTTP port</label><input type="number" id="httpPort" value="10808"></div>
       </div>
     </div>
 
@@ -1117,8 +1120,8 @@ genBtn.addEventListener('click', () => {
   const dnsList = document.getElementById('dnsServers').value.split(',').map(s => s.trim()).filter(Boolean);
   const opts = {
     mode: currentMode,
-    socksPort: parseInt(document.getElementById('socksPort').value, 10) || 1080,
-    httpPort: parseInt(document.getElementById('httpPort').value, 10) || 1081,
+    socksPort: parseInt(document.getElementById('socksPort').value, 10) || 10809,
+    httpPort: parseInt(document.getElementById('httpPort').value, 10) || 10808,
     tunName: document.getElementById('tunName').value.trim(),
     tunMtu: parseInt(document.getElementById('tunMtu').value, 10) || 1500,
     tunGw4: document.getElementById('tunGw4').value.trim(),
@@ -1242,7 +1245,7 @@ function importConfig(cfg){
   const mode = tunInbound ? 'tun' : 'socks';
 
   if(socksInbound){
-    document.getElementById('socksPort').value = socksInbound.port || 1080;
+    document.getElementById('socksPort').value = socksInbound.port || 10809;
     document.getElementById('listenAddress').value = socksInbound.listen === '0.0.0.0' ? '0.0.0.0' : '127.0.0.1';
     document.getElementById('socksUdp').value = (socksInbound.settings && socksInbound.settings.udp === false) ? 'false' : 'true';
     const users = socksInbound.settings && socksInbound.settings.users;
@@ -1250,7 +1253,7 @@ function importConfig(cfg){
     document.getElementById('authUser').value = (users && users[0] && users[0].user) || 'user';
     document.getElementById('authPass').value = (users && users[0] && users[0].pass) || '';
   }
-  if(httpInbound) document.getElementById('httpPort').value = httpInbound.port || 1081;
+  if(httpInbound) document.getElementById('httpPort').value = httpInbound.port || 10808;
   if(tunInbound){
     const ts = tunInbound.settings || {};
     document.getElementById('tunName').value = ts.name || 'xray0';
@@ -1327,23 +1330,46 @@ function importConfig(cfg){
   return { protocol: ob.protocol, extraOutbounds: extraOutbounds.length };
 }
 
-document.getElementById('importBtn').addEventListener('click', () => {
+function runImportFromText(raw, sourceLabel){
   const importErrors = document.getElementById('importErrors');
   importErrors.innerHTML = '';
-  const raw = document.getElementById('configImportInput').value.trim();
-  if(!raw){ importErrors.innerHTML = '<div class="error-line">Paste a config.json first.</div>'; return; }
+  raw = (raw || '').trim();
+  if(!raw){ importErrors.innerHTML = '<div class="error-line">' + (sourceLabel === 'file' ? 'That file was empty.' : 'Paste a config.json first.') + '</div>'; return; }
   let cfg;
   try{ cfg = JSON.parse(raw); }
   catch(e){ importErrors.innerHTML = '<div class="error-line">Not valid JSON: ' + escapeHtml(e.message) + '</div>'; return; }
   try{
     const result = importConfig(cfg);
-    parseSummary.textContent = 'Imported 1 server (' + result.protocol + ') from config.json.';
+    parseSummary.textContent = 'Imported 1 server (' + result.protocol + ') from ' + (sourceLabel === 'file' ? 'the uploaded config.json.' : 'config.json.');
     if(result.extraOutbounds > 0){
       importErrors.innerHTML = '<div class="note">This config had ' + result.extraOutbounds + ' other proxy outbound(s) besides the active one — balancers and multi-server setups aren\'t supported here, so only the active proxy outbound was imported.</div>';
     }
   }catch(e){
     importErrors.innerHTML = '<div class="error-line">' + escapeHtml(e.message) + '</div>';
   }
+}
+
+document.getElementById('importBtn').addEventListener('click', () => {
+  runImportFromText(document.getElementById('configImportInput').value, 'paste');
+});
+
+document.getElementById('uploadConfigBtn').addEventListener('click', () => {
+  document.getElementById('configFileInput').click();
+});
+document.getElementById('configFileInput').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  const nameEl = document.getElementById('uploadedFileName');
+  if(!file){ nameEl.textContent = ''; return; }
+  nameEl.textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = () => {
+    document.getElementById('configImportInput').value = reader.result;
+    runImportFromText(reader.result, 'file');
+  };
+  reader.onerror = () => {
+    document.getElementById('importErrors').innerHTML = '<div class="error-line">Could not read that file.</div>';
+  };
+  reader.readAsText(file);
 });
 
 setFlowStep(1);
