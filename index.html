@@ -655,7 +655,7 @@ function buildStreamSettings(t, fpOverride, tlsExtra){
     case 'websocket':
       ss.network = 'websocket';
       ss.wsSettings = { path: t.path || '/' };
-      if(t.host) ss.wsSettings.headers = { Host: t.host };
+      if(t.host) ss.wsSettings.host = t.host;
       break;
     case 'grpc':
       ss.grpcSettings = { serviceName: t.serviceName || '', multiMode: false };
@@ -873,7 +873,7 @@ function transportFromStreamSettings(ss){
 
   if((network === 'websocket' || network === 'ws') && ss.wsSettings){
     path = ss.wsSettings.path || '/';
-    host = (ss.wsSettings.headers && ss.wsSettings.headers.Host) || '';
+    host = ss.wsSettings.host || (ss.wsSettings.headers && ss.wsSettings.headers.Host) || ''; // accept the old headers.Host form too, for configs from before this fix
   } else if(network === 'grpc' && ss.grpcSettings){
     serviceName = ss.grpcSettings.serviceName || '';
   } else if(network === 'xhttp' && ss.xhttpSettings){
