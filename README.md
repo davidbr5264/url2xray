@@ -43,6 +43,48 @@ Checked against the current official docs (xtls.github.io) and recent xray-core 
 - **TLS `allowInsecure` is deprecated** in favor of `pinnedPeerCertSha256`, though still documented as functional — only emitted when a link explicitly requests it, with a warning that newer builds may reject it.
 - **Hysteria2 outbound's `settings` object is much leaner** than previously modeled — just `version`/`address`/`port`; auth and TLS behavior live entirely in `streamSettings`.
 
+## TUN on Windows: real, documented reliability caveats (not generic caution)
+
+Re-checked TUN specifically against open xray-core GitHub issues, since it's had genuinely rougher edges on Windows than Linux/macOS:
+
+- **`wintun.dll` isn't bundled** with xray-core — it has to be placed next to `xray.exe` manually, or the TUN device silently fails to create.
+- **A currently-open bandwidth bug** (XTLS/Xray-core#5599): TUN connections on Windows stall/disconnect above roughly 10–15 Mbps, traced to a gVisor/Windows interaction; SOCKS mode isn't affected.
+- **`autoOutboundsInterface` doesn't always reliably prevent routing loops on Windows** (XTLS/Xray-core#6019) — one user reported TUN not working at all until manually setting `sendThrough`.
+- **IPv6 needs the adapter to already have a routable address**, not just the auto-assigned link-local one.
+- **No killswitch-friendly interface type** — Windows doesn't classify xray's TUN adapter as "Remote Access," so the common built-in-Firewall kill-switch rule doesn't apply to it.
+- A maintainer/contributor said directly in a GitHub discussion that **"xray tun mode is not stable"**, recommending SOCKS + tun2socks instead; the wider community also leans toward sing-box/mihomo for TUN specifically because those implementations are more feature-complete (strict-route, auto-redirect, UID/package filtering — none of which xray's own TUN has).
+
+Two concrete changes from this:
+- Added a **`sendThrough` field** (TUN options) — a manual fallback for the routing-loop problem, binding the proxy and direct outbounds' egress to a specific physical-adapter IP, for exactly the failure mode reported in #6019.
+- Replaced the generic "needs elevated privileges" note with the specific list above, directly in the TUN options panel — not just here in the README, since that's where someone actually hits the wall.
+
+If TUN keeps giving you grief on Windows specifically, SOCKS mode (this tool's other output) paired with tun2socks, or routing sing-box/mihomo's TUN in front of xray, are both better-tested paths than xray's native TUN on that platform.
+
+## Fixed: WebSocket "host" was nested in the wrong place
+
+Found while re-verifying transport schemas: the current official `wsSettings` schema has `host` as its own **top-level field**, separate from `headers` (which is now for arbitrary custom headers, not specifically `Host`). This generator had been putting it at `wsSettings.headers.Host` instead — the older, no-longer-canonical form. Fixed in both the generator and the round-trip importer (which now accepts either form on import, so it can still read configs produced before this fix). Added as regression test #1 in `test-suite.js`.
+
+## Default ports changed, and config.json import now supports file upload
+
+- Default SOCKS port is now **10809**, default HTTP port is now **10808** (previously 1080/1081).
+- The "Import an existing config.json" section now has an **Upload file…** button alongside the paste box — pick a `.json` file from disk and it's read, imported, and populates the form automatically, same end result as pasting it in. Both paths share the same import logic under the hood, so there's no behavioral difference between the two.
+- Both changes are covered by two new tests in `test-suite.js` (now 27 total, up from 25), including a full round-trip check that uploading a file reproduces byte-for-byte the same config as pasting the same JSON would.
+
+## Reliability: committed regression test suite
+
+`test-suite.js` (+ `package.json`) is a permanent test suite, not a one-off — every ad-hoc check I ran by hand throughout this project (all protocols, all transports, every advanced option, both round-trip import scenarios, all four confirmed-bug regressions, and the import error paths) is now a standing, re-runnable test.
+
+Crucially, it doesn't re-implement or copy the generator's logic into a parallel test file that could drift out of sync — it loads the **real** `index.html` into a headless browser (jsdom) and drives it exactly like a person would: types into fields, clicks buttons, reads the generated JSON back out of the page. So it's testing the actual shipped code path, not a stand-in for it.
+
+```bash
+npm install
+node test-suite.js
+```
+
+25 tests, exits non-zero on any failure (CI-friendly). Sanity-checked the suite itself by deliberately reintroducing the `accounts`→`users` bug into a scratch copy and confirming it fails (2/25) rather than passing regardless of what's in the file — so this isn't a tautological check, it actually catches regressions.
+
+Re-run this after any future edit to `index.html` before redeploying.
+
 ## Fixed: SOCKS/HTTP inbound auth used the wrong field name
 
 Re-checked every protocol/feature against the current docs again, and found one real, confirmed bug: the inbound-auth feature (added a few turns back) wrote credentials into an `"accounts"` array. **The actual xray-core field is `"users"`.** `"accounts"` isn't rejected — it just parses fine and is silently ignored at runtime, so the inbound stays wide open with no auth at all. This is a known community pitfall (see XTLS/Xray-core#4487 and #5943, where people hit exactly this and reported auth "just doesn't work"). Fixed for both the SOCKS and HTTP inbounds.
