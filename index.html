@@ -242,7 +242,11 @@ trojan://password@server2.example.com:443?security=tls&type=ws&host=cdn.example.
         <label class="check"><input type="checkbox" id="tunAutoRoute" checked> Let xray manage system routing automatically (<code>autoSystemRoutingTable</code>)</label>
         <label class="check"><input type="checkbox" id="tunAutoIface" checked> Auto-bind xray's own outbound traffic to the physical interface (<code>autoOutboundsInterface</code>, prevents routing loops)</label>
       </div>
+      <div class="grid" style="margin-top:10px;">
+        <div class="field"><label>Manual routing-loop fallback: <code>sendThrough</code> IP (optional)</label><input type="text" id="tunSendThrough" placeholder="e.g. 192.168.1.50 — your physical adapter's IP"></div>
+      </div>
       <div class="note">TUN mode needs to run xray-core with elevated privileges (admin/root) since it creates a system network interface. On a fresh box, also double check your OS lets the process create <code>wintun</code>/<code>utun</code>/TUN devices.</div>
+      <div class="note"><b>Windows specifically has several documented rough edges</b> with xray-core's own TUN inbound (this isn't generic caution — these are real, currently open issues): <code>wintun.dll</code> isn't bundled and must be placed next to <code>xray.exe</code> manually or TUN silently fails to start; there's a currently-open bug (XTLS/Xray-core#5599) where connections stall above roughly 10–15 Mbps due to a gVisor/Windows interaction, with SOCKS mode unaffected; <code>autoOutboundsInterface</code> has been reported to not reliably prevent routing loops on Windows, in which case set the <code>sendThrough</code> field above to your physical adapter's IP as a manual fallback; IPv6 needs the adapter to already have a routable (non-link-local) address; and Windows doesn't classify xray's TUN adapter as a "Remote Access" interface, so the common built-in-Firewall killswitch trick doesn't apply to it. If TUN gives you trouble on Windows, SOCKS mode paired with a separate tool like tun2socks, or another TUN implementation (sing-box/mihomo) in front of xray, are both more mature-tested paths — several xray-core maintainers/contributors have said as much themselves.</div>
     </div>
 
     <div class="checks" style="margin-top:16px;">
@@ -828,13 +832,22 @@ function buildConfig(server, opts){
     };
   }
 
+  const directOutbound = { tag: 'direct', protocol: 'freedom', settings: directSettings };
+  // sendThrough is a manual fallback for the routing-loop problem TUN mode can hit — most
+  // commonly reported on Windows, where autoOutboundsInterface doesn't always reliably bind
+  // xray's own egress traffic to the physical adapter. Only meaningful (and only emitted) in TUN mode.
+  if(opts.mode === 'tun' && opts.tunSendThrough){
+    outbound.sendThrough = opts.tunSendThrough;
+    directOutbound.sendThrough = opts.tunSendThrough;
+  }
+
   return {
     log: { loglevel: opts.logLevel },
     dns,
     inbounds,
     outbounds: [
       outbound,
-      { tag: 'direct', protocol: 'freedom', settings: directSettings },
+      directOutbound,
       { tag: 'block', protocol: 'blackhole', settings: {} }
     ],
     routing: { domainStrategy: opts.routingDomainStrategy || 'IPIfNonMatch', rules }
@@ -1128,6 +1141,7 @@ genBtn.addEventListener('click', () => {
     tunGw6: document.getElementById('tunGw6').value.trim(),
     tunAutoRoute: document.getElementById('tunAutoRoute').checked,
     tunAutoIface: document.getElementById('tunAutoIface').checked,
+    tunSendThrough: document.getElementById('tunSendThrough').value.trim(),
     bypassPrivate: document.getElementById('optBypassPrivate').checked,
     blockAds: document.getElementById('optBlockAds').checked,
     dnsList,
@@ -1263,6 +1277,7 @@ function importConfig(cfg){
     document.getElementById('tunGw6').value = gw.find(g => g.indexOf(':') !== -1) || '';
     document.getElementById('tunAutoRoute').checked = !!ts.autoSystemRoutingTable;
     document.getElementById('tunAutoIface').checked = !!ts.autoOutboundsInterface;
+    document.getElementById('tunSendThrough').value = ob.sendThrough || '';
   }
   setMode(mode);
 
