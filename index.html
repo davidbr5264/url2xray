@@ -1121,6 +1121,66 @@ function updateMuxVisionNote(){
   document.getElementById('muxVisionNote').style.display = (isVision && muxOn) ? '' : 'none';
 }
 
+// ---------- pre-export structural validation ----------
+// Catches configs that would parse as valid JSON but fail at runtime (or silently misbehave)
+// in xray-core itself — so problems surface here instead of only when the binary refuses to start.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CIDR_RE = /^[0-9a-fA-F:.]+\/\d{1,3}$/;
+const INT_RANGE_RE = /^\d+(-\d+)?$/;
+const KNOWN_SS_METHODS = ['aes-128-gcm','aes-256-gcm','chacha20-poly1305','chacha20-ietf-poly1305','xchacha20-poly1305','2022-blake3-aes-128-gcm','2022-blake3-aes-256-gcm','2022-blake3-chacha20-poly1305','none','plain'];
+const validPort = p => Number.isInteger(p) && p >= 1 && p <= 65535;
+
+function validateServer(server, opts){
+  const errors = [];   // would very likely stop xray-core from starting or connecting at all — block export
+  const warnings = []; // suspicious but not necessarily fatal — export anyway, just flag it
+
+  if(!server.address) errors.push('Server address is empty.');
+  if(!validPort(server.port)) errors.push('Server port "' + server.port + '" is out of the valid 1–65535 range.');
+
+  if(server.protocol === 'vless' || server.protocol === 'vmess'){
+    if(!server.uuid) errors.push((server.protocol === 'vless' ? 'VLESS' : 'VMess') + ' UUID is empty.');
+    else if(!UUID_RE.test(server.uuid)) warnings.push('UUID "' + server.uuid + '" doesn\'t look like a standard UUID — double check it was copied correctly.');
+  }
+  if(server.protocol === 'trojan' && !server.password) errors.push('Trojan password is empty.');
+  if(server.protocol === 'shadowsocks'){
+    if(!server.password) errors.push('Shadowsocks password is empty.');
+    if(!server.method) errors.push('Shadowsocks method is empty.');
+    else if(!KNOWN_SS_METHODS.includes(server.method)) warnings.push('Shadowsocks method "' + server.method + '" isn\'t one of the commonly recognized ciphers — verify your xray-core build actually supports it.');
+  }
+  if(server.protocol === 'hysteria' && !server.auth) errors.push('Hysteria2 auth string is empty.');
+
+  const t = server.transport;
+  if(t){
+    if(t.security === 'reality'){
+      if(!t.pbk) errors.push('REALITY is selected but the public key (pbk) is empty — the handshake cannot succeed without it.');
+      if(!t.fp) warnings.push('REALITY has no client fingerprint set — most deployments expect one (e.g. chrome).');
+      if(t.sid && !/^[0-9a-f]*$/i.test(t.sid)) warnings.push('REALITY shortId "' + t.sid + '" contains non-hex characters, which isn\'t valid for this field.');
+    }
+    if(t.security === 'tls' && !t.sni) warnings.push('TLS is selected but there\'s no SNI/serverName set — many servers rely on this to route the handshake correctly.');
+    if(t.network === 'grpc' && !t.serviceName) warnings.push('gRPC transport has no serviceName set — this almost always needs to match the server\'s configuration exactly.');
+  }
+
+  if(opts.mode === 'socks'){
+    if(!validPort(opts.socksPort)) errors.push('SOCKS port "' + opts.socksPort + '" is out of the valid 1–65535 range.');
+    if(!validPort(opts.httpPort)) errors.push('HTTP port "' + opts.httpPort + '" is out of the valid 1–65535 range.');
+    if(opts.socksPort === opts.httpPort) errors.push('SOCKS port and HTTP port are both ' + opts.socksPort + ' — two inbounds can\'t bind the same port, xray-core will fail to start.');
+  } else {
+    if(opts.tunGw4 && !CIDR_RE.test(opts.tunGw4)) warnings.push('IPv4 gateway "' + opts.tunGw4 + '" doesn\'t look like a valid CIDR (e.g. 10.10.0.1/24).');
+    if(opts.tunGw6 && !CIDR_RE.test(opts.tunGw6)) warnings.push('IPv6 gateway "' + opts.tunGw6 + '" doesn\'t look like a valid CIDR (e.g. fc00::1/64).');
+  }
+
+  if(opts.fragment && opts.fragment.enabled){
+    const packets = opts.fragment.packets;
+    if(packets && packets !== 'tlshello' && !INT_RANGE_RE.test(packets)) warnings.push('Fragment packets "' + packets + '" should be "tlshello" or a number/range like "1-3".');
+    ['length','interval'].forEach(f => {
+      const v = opts.fragment[f];
+      if(v && !INT_RANGE_RE.test(v)) warnings.push('Fragment ' + f + ' "' + v + '" doesn\'t look like a valid number or range (e.g. "100-200").');
+    });
+  }
+
+  return { errors, warnings };
+}
+
 genBtn.addEventListener('click', () => {
   const server = parsedServers.find(s => s.id === selectedId);
   outputWarning.innerHTML = '';
@@ -1179,11 +1239,24 @@ genBtn.addEventListener('click', () => {
     blockDns53: document.getElementById('optBlockDns53').checked
   };
 
+  const validation = validateServer(server, opts);
+  if(validation.errors.length){
+    outputWarning.innerHTML =
+      '<div class="note" style="border-color:rgba(229,72,77,.4);"><b style="color:var(--red);">Fix these before exporting</b> — this config would very likely fail to start or connect in xray-core:<ul style="margin:8px 0 0;padding-left:18px;">' +
+      validation.errors.map(e => '<li>' + escapeHtml(e) + '</li>').join('') +
+      '</ul></div>';
+    output.style.display = 'none';
+    copyBtn.style.display = 'none';
+    downloadBtn.style.display = 'none';
+    return;
+  }
+
   let cfg;
   try{ cfg = buildConfig(server, opts); }
   catch(e){ outputWarning.innerHTML = '<div class="error-line">' + e.message + '</div>'; return; }
 
   const notes = [];
+  validation.warnings.forEach(w => notes.push('<b>Note:</b> ' + escapeHtml(w)));
   if(server.protocol === 'hysteria'){
     notes.push('<b>Note:</b> Hysteria2 outbound support in xray-core is newer and has had version-to-version bugs. Test connectivity before relying on it, and check your installed xray-core changelog if it misbehaves.');
   }
