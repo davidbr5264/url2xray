@@ -5,269 +5,120 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>xray-core Config Generator</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap');
 
   :root{
-    --bg: #0a0d10;
-    --panel: #10151a;
-    --panel-2: #141a20;
-    --border: #232b32;
-    --text: #dce4ea;
-    --sub: #7d8b96;
-    --mono: 'JetBrains Mono', monospace;
-    --sans: 'Inter', sans-serif;
-    --teal: #4fd1c5;
-    --amber: #f2a93b;
-    --red: #e5484d;
-    --teal-dim: rgba(79,209,197,0.12);
+    --bg: #0a0d10; --panel: #10151a; --border: #232b32;
+    --text: #dce4ea; --sub: #7d8b96;
+    --mono: 'JetBrains Mono', monospace; --sans: 'Inter', sans-serif;
+    --teal: #4fd1c5; --red: #e5484d; --teal-dim: rgba(79,209,197,0.12);
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);}
-  body{
-    background-image:
-      radial-gradient(circle at 15% 0%, rgba(79,209,197,0.06), transparent 40%),
-      radial-gradient(circle at 85% 20%, rgba(242,169,59,0.05), transparent 35%);
-    min-height:100vh;
-  }
-  a{color:var(--teal);}
-  .wrap{max-width:920px;margin:0 auto;padding:40px 20px 90px;}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);}
+  .wrap{max-width:820px;margin:0 auto;padding:40px 20px 80px;}
 
-  header{margin-bottom:34px;}
-  .eyebrow{
-    font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--teal);
-    text-transform:uppercase;display:flex;align-items:center;gap:8px;margin-bottom:10px;
-  }
-  .eyebrow::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--teal);box-shadow:0 0 8px var(--teal);}
-  h1{font-family:var(--mono);font-weight:700;font-size:28px;margin:0 0 8px;letter-spacing:-0.01em;}
-  header p{color:var(--sub);font-size:14.5px;line-height:1.55;max-width:620px;margin:0;}
+  h1{font-family:var(--mono);font-weight:700;font-size:26px;margin:0 0 6px;}
+  header p{color:var(--sub);font-size:14px;line-height:1.5;max-width:600px;margin:0 0 30px;}
 
-  .flow{
-    display:flex;align-items:center;gap:0;margin:26px 0 8px;padding:16px 18px;
-    background:var(--panel);border:1px solid var(--border);border-radius:10px;
-    font-family:var(--mono);font-size:12px;color:var(--sub);overflow-x:auto;
-  }
-  .flow .node{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:86px;flex-shrink:0;}
-  .flow .dot{width:10px;height:10px;border-radius:50%;background:var(--border);border:1px solid var(--border);}
-  .flow .node.active .dot{background:var(--teal);box-shadow:0 0 8px var(--teal);border-color:var(--teal);}
-  .flow .node.active span{color:var(--teal);}
-  .flow .line{flex:1;height:1px;background:var(--border);min-width:20px;position:relative;top:-14px;}
-  .flow .line.active{background:linear-gradient(90deg, var(--teal), var(--border));}
+  section{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px 22px;margin-bottom:16px;}
+  h2{font-family:var(--mono);font-size:14px;margin:0 0 12px;color:var(--teal);}
 
-  section.step{
-    background:var(--panel);border:1px solid var(--border);border-radius:12px;
-    padding:22px 24px;margin-bottom:18px;
-  }
-  .step-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px;}
-  .step-num{font-family:var(--mono);color:var(--teal);font-size:13px;font-weight:700;}
-  .step-title{font-family:var(--mono);font-size:15px;font-weight:700;}
-  .step-hint{color:var(--sub);font-size:13px;margin:-8px 0 14px;}
-
-  textarea{
-    width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;
-    color:var(--text);font-family:var(--mono);font-size:13px;padding:14px;resize:vertical;
-    min-height:120px;line-height:1.5;
-  }
-  textarea:focus, input:focus, select:focus{outline:2px solid var(--teal);outline-offset:1px;}
+  textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);
+    font-family:var(--mono);font-size:13px;padding:12px;resize:vertical;min-height:110px;line-height:1.5;}
   textarea::placeholder{color:#495158;}
 
   .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center;}
-  button{
-    font-family:var(--sans);font-weight:600;font-size:13.5px;border-radius:7px;
-    padding:9px 16px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);
-    cursor:pointer;transition:border-color .15s, background .15s;
-  }
+  button{font-family:var(--sans);font-weight:600;font-size:13.5px;border-radius:7px;padding:9px 16px;
+    border:1px solid var(--border);background:#161c22;color:var(--text);cursor:pointer;}
   button:hover{border-color:var(--teal);}
   button.primary{background:var(--teal);color:#04211d;border-color:var(--teal);}
-  button.primary:hover{background:#69ddd2;}
   button:disabled{opacity:.4;cursor:not-allowed;}
-  button.small{padding:6px 10px;font-size:12px;}
 
-  .server-list{display:flex;flex-direction:column;gap:8px;margin-top:6px;}
-  .server{
-    display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);
-    border-radius:8px;background:var(--bg);cursor:pointer;
-  }
+  .server{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);
+    border-radius:8px;margin-top:8px;cursor:pointer;}
   .server.selected{border-color:var(--teal);background:var(--teal-dim);}
-  .server.unsupported{opacity:.55;}
-  .server input[type=radio]{accent-color:var(--teal);}
-  .server .meta{flex:1;min-width:0;}
-  .server .name{font-family:var(--mono);font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .server .sub{font-size:12px;color:var(--sub);margin-top:2px;}
-  .badge{
-    font-family:var(--mono);font-size:10.5px;padding:2px 7px;border-radius:20px;
-    border:1px solid var(--border);color:var(--sub);text-transform:uppercase;letter-spacing:.04em;
-    flex-shrink:0;
-  }
-  .badge.proto-vless{color:var(--teal);border-color:var(--teal);}
-  .badge.proto-vmess{color:#8a7ff0;border-color:#8a7ff0;}
-  .badge.proto-trojan{color:var(--amber);border-color:var(--amber);}
-  .badge.proto-shadowsocks{color:#5fb0f2;border-color:#5fb0f2;}
-  .badge.proto-hysteria{color:#f27ab8;border-color:#f27ab8;}
-  .badge.proto-tuic{color:var(--red);border-color:var(--red);}
-  .warn-badge{font-size:11px;color:var(--red);font-family:var(--mono);}
-
-  .error-line{font-family:var(--mono);font-size:12.5px;color:var(--red);padding:8px 10px;background:rgba(229,72,77,.08);border:1px solid rgba(229,72,77,.3);border-radius:6px;margin-top:8px;}
-  .note{font-size:12.5px;color:var(--sub);line-height:1.5;margin-top:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:7px;}
-  .note b{color:var(--amber);}
-
-  .mode-toggle{display:flex;gap:8px;margin-bottom:16px;}
-  .mode-btn{flex:1;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);cursor:pointer;text-align:left;}
-  .mode-btn.active{border-color:var(--teal);background:var(--teal-dim);}
-  .mode-btn .t{font-family:var(--mono);font-weight:700;font-size:13.5px;}
-  .mode-btn .d{font-size:12px;color:var(--sub);margin-top:3px;}
+  .server .name{font-family:var(--mono);font-size:13px;font-weight:600;}
+  .server .sub{font-size:12px;color:var(--sub);}
+  .badge{font-family:var(--mono);font-size:10.5px;padding:2px 7px;border-radius:20px;border:1px solid var(--border);
+    color:var(--sub);text-transform:uppercase;}
 
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
   @media (max-width:560px){.grid{grid-template-columns:1fr;}}
-  .field label{display:block;font-family:var(--mono);font-size:11.5px;color:var(--sub);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
-  .field input[type=text], .field input[type=number], .field select{
-    width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;
-    color:var(--text);padding:9px 10px;font-family:var(--mono);font-size:13px;
-  }
-  .checks{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
-  .check{display:flex;align-items:center;gap:8px;font-size:13px;}
+  .field label{display:block;font-family:var(--mono);font-size:11px;color:var(--sub);margin-bottom:4px;text-transform:uppercase;}
+  .field input, .field select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;
+    color:var(--text);padding:8px 10px;font-family:var(--mono);font-size:13px;}
+
+  .mode-toggle{display:flex;gap:8px;margin-bottom:14px;}
+  .mode-btn{flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);cursor:pointer;}
+  .mode-btn.active{border-color:var(--teal);background:var(--teal-dim);}
+  .mode-btn .t{font-family:var(--mono);font-weight:700;font-size:13px;}
+  .mode-btn .d{font-size:11.5px;color:var(--sub);margin-top:2px;}
+
+  .check{display:flex;align-items:center;gap:8px;font-size:13px;margin-top:8px;}
   .check input{accent-color:var(--teal);}
 
-  details.adv{margin-top:18px;border-top:1px solid var(--border);padding-top:14px;}
-  details.adv summary{
-    cursor:pointer;font-family:var(--mono);font-size:12.5px;color:var(--teal);
-    text-transform:uppercase;letter-spacing:.05em;font-weight:700;list-style:none;
-    display:flex;align-items:center;gap:6px;
-  }
-  details.adv summary::-webkit-details-marker{display:none;}
-  details.adv summary::before{content:'▸';transition:transform .15s;}
-  details.adv[open] summary::before{transform:rotate(90deg);}
-  .adv-group{margin-top:18px;padding-top:16px;border-top:1px dashed var(--border);}
-  .adv-group:first-of-type{border-top:none;padding-top:14px;}
-  .adv-label{font-family:var(--mono);font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
-  .domain-preview{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;min-height:0;}
-  .domain-pill{font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);color:var(--sub);}
-  .domain-pill.warn{color:var(--red);border-color:rgba(229,72,77,.4);}
+  .note{font-size:12.5px;color:var(--sub);line-height:1.5;margin-top:10px;padding:9px 11px;
+    background:var(--bg);border:1px solid var(--border);border-radius:7px;}
+  .error{font-family:var(--mono);font-size:12.5px;color:var(--red);padding:7px 9px;
+    background:rgba(229,72,77,.08);border:1px solid rgba(229,72,77,.3);border-radius:6px;margin-top:8px;}
 
-  pre#output{
-    background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;
-    font-family:var(--mono);font-size:12.5px;line-height:1.55;overflow:auto;max-height:520px;
-    white-space:pre;
-  }
+  pre{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;
+    font-family:var(--mono);font-size:12.5px;line-height:1.5;overflow:auto;max-height:480px;white-space:pre;}
   .tok-key{color:#7fb0e0;} .tok-str{color:#a8d18a;} .tok-num{color:#e0a458;} .tok-bool{color:#e07ab8;}
 
-  footer{margin-top:30px;color:var(--sub);font-size:12.5px;text-align:center;}
-  footer a{color:var(--sub);text-decoration:underline;}
+  footer{margin-top:24px;color:var(--sub);font-size:12px;text-align:center;}
 </style>
 </head>
 <body>
 <div class="wrap">
-
   <header>
-    <div class="eyebrow">xray-core / client config</div>
-    <h1>Link → Config Generator</h1>
-    <p>Paste one or more <code>vless://</code>, <code>vmess://</code>, <code>trojan://</code>, <code>ss://</code>, <code>hysteria2://</code>, or <code>tuic://</code> links, pick SOCKS proxy or native TUN, and get a ready-to-run xray-core <code>config.json</code>. Everything runs in your browser — nothing is uploaded anywhere.</p>
+    <h1>xray-core Config Generator</h1>
+    <p>Paste a <code>vless://</code>, <code>vmess://</code>, <code>trojan://</code>, <code>ss://</code>, or <code>hysteria2://</code> link, pick SOCKS proxy or TUN, get a ready-to-run config.json. Runs entirely in your browser — nothing is uploaded anywhere.</p>
   </header>
 
-  <div class="flow" id="flow">
-    <div class="node active" data-n="1"><div class="dot"></div><span>01 INPUT</span></div>
-    <div class="line" id="ln1"></div>
-    <div class="node" data-n="2"><div class="dot"></div><span>02 PARSE</span></div>
-    <div class="line" id="ln2"></div>
-    <div class="node" data-n="3"><div class="dot"></div><span>03 CONFIGURE</span></div>
-    <div class="line" id="ln3"></div>
-    <div class="node" data-n="4"><div class="dot"></div><span>04 EXPORT</span></div>
-  </div>
-
-  <!-- STEP 1: INPUT -->
-  <section class="step">
-    <div class="step-head"><span class="step-num">01</span><span class="step-title">Paste links</span></div>
-    <div class="step-hint">One link per line. Subscription blobs (a single base64 string containing multiple links) are also detected automatically.</div>
-    <textarea id="linkInput" placeholder="vless://uuid@server.example.com:443?security=reality&sni=www.example.com&fp=chrome&pbk=...&sid=...&type=tcp&flow=xtls-rprx-vision#My%20Server
-trojan://password@server2.example.com:443?security=tls&type=ws&host=cdn.example.com&path=%2Fws#Server%202"></textarea>
+  <section>
+    <h2>1. Paste link(s)</h2>
+    <textarea id="linkInput" placeholder="vless://uuid@server.example.com:443?security=tls&sni=example.com#My%20Server"></textarea>
     <div class="row">
-      <button class="primary" id="parseBtn">Parse links</button>
-      <button id="clearBtn">Clear</button>
+      <button class="primary" id="parseBtn">Parse</button>
       <span id="parseSummary" style="font-family:var(--mono);font-size:12.5px;color:var(--sub);"></span>
     </div>
     <div id="parseErrors"></div>
-
-    <details class="adv" style="margin-top:22px;">
-      <summary>Import an existing config.json instead</summary>
-      <div class="adv-group" style="border-top:none;padding-top:14px;">
-        <div class="step-hint" style="margin:0 0 10px;">Upload or paste a config.json this tool (or xray-core itself) already produced. It'll pull the active server, inbound mode, and every advanced option back into the form below so you can tweak and re-export. Only the outbound tagged <code>proxy</code> (or the first non-infrastructure outbound) is imported — configs with multiple proxy outbounds/balancers aren't supported yet.</div>
-        <textarea id="configImportInput" style="min-height:100px;" placeholder="Paste config.json here, or use Upload file below"></textarea>
-        <div class="row">
-          <button class="primary" id="importBtn">Import config.json</button>
-          <button id="uploadConfigBtn">Upload file…</button>
-          <input type="file" id="configFileInput" accept="application/json,.json" style="display:none;">
-          <span id="uploadedFileName" style="font-family:var(--mono);font-size:12.5px;color:var(--sub);"></span>
-        </div>
-        <div id="importErrors"></div>
-      </div>
-    </details>
   </section>
 
-  <!-- STEP 2: PARSED SERVERS -->
-  <section class="step" id="serversSection" style="display:none;">
-    <div class="step-head"><span class="step-num">02</span><span class="step-title">Choose active server</span></div>
-    <div class="step-hint">The generator builds a config with one active outbound. Select which parsed server it should connect through.</div>
-    <div class="server-list" id="serverList"></div>
+  <section id="serverSection" style="display:none;">
+    <h2>2. Server</h2>
+    <div id="serverList"></div>
   </section>
 
-  <!-- STEP 3: OPTIONS -->
-  <section class="step" id="optionsSection" style="display:none;">
-    <div class="step-head"><span class="step-num">03</span><span class="step-title">Inbound mode &amp; options</span></div>
-
+  <section id="optionsSection" style="display:none;">
+    <h2>3. Options</h2>
     <div class="mode-toggle">
-      <div class="mode-btn active" data-mode="socks" id="modeBtnSocks">
+      <div class="mode-btn active" id="modeBtnSocks">
         <div class="t">SOCKS + HTTP proxy</div>
-        <div class="d">Local proxy on 127.0.0.1. Point apps/browser at it manually, or via a system proxy setting.</div>
+        <div class="d">Local proxy on 127.0.0.1</div>
       </div>
-      <div class="mode-btn" data-mode="tun" id="modeBtnTun">
-        <div class="t">TUN (system-wide)</div>
-        <div class="d">Native xray-core TUN inbound — captures all device traffic. Needs elevated/admin privileges to run.</div>
-      </div>
-    </div>
-
-    <div id="socksOptions">
-      <div class="grid">
-        <div class="field"><label>SOCKS port</label><input type="number" id="socksPort" value="10809"></div>
-        <div class="field"><label>HTTP port</label><input type="number" id="httpPort" value="10808"></div>
+      <div class="mode-btn" id="modeBtnTun">
+        <div class="t">TUN</div>
+        <div class="d">System-wide, needs admin/root</div>
       </div>
     </div>
 
-    <div id="tunOptions" style="display:none;">
-      <div class="note" style="border-color:rgba(242,169,59,.4);"><b>Important, from xray-core's own <code>proxy/tun/README.md</code>:</b> the TUN inbound only brings a bare network interface up — <code>name</code> and MTU are the <i>only</i> real settings fields. There is no built-in gateway/IP assignment, no automatic system routing, and no "avoid routing loops automatically" switch in xray-core itself, however much some third-party guides (including an earlier version of this tool) imply otherwise. All addressing and routing has to be configured at the <b>OS level</b>, entirely outside this JSON — this tool now generates copy-pasteable commands for that below, instead of silently putting nonexistent fields in the config.</div>
-      <div class="grid">
-        <div class="field"><label>Interface name</label><input type="text" id="tunName" value="xray0"></div>
-        <div class="field"><label>MTU</label><input type="number" id="tunMtu" value="1500"></div>
-      </div>
-
-      <div class="grid" style="margin-top:14px;">
-        <div class="field"><label>Target OS (for the routing commands below)</label>
-          <select id="tunOS">
-            <option value="linux" selected>Linux</option>
-            <option value="windows">Windows</option>
-            <option value="macos">macOS</option>
-            <option value="freebsd">FreeBSD</option>
-          </select>
-        </div>
-        <div class="field"><label>Planned interface IP (informational only — not in the JSON)</label><input type="text" id="tunGw4" value="10.10.0.1/24"></div>
-      </div>
-      <div class="grid" style="margin-top:10px;">
-        <div class="field"><label>Manual routing-loop fallback: <code>sendThrough</code> IP (optional, real field)</label><input type="text" id="tunSendThrough" placeholder="e.g. 192.168.1.50 — your physical adapter's IP"></div>
-      </div>
-
-      <div class="note">TUN mode needs to run xray-core with elevated privileges (admin/root) since it creates a system network interface. Windows additionally needs <code>wintun.dll</code> placed next to <code>xray.exe</code> manually — it isn't bundled — or the interface silently fails to appear.</div>
-      <div class="note"><b>Windows specifically has several other documented rough edges:</b> a currently-open bug (XTLS/Xray-core#5599) where TUN connections stall above roughly 10–15 Mbps due to a gVisor/Windows interaction, with SOCKS mode unaffected; the interface ID needed for manual <code>route add ... if &lt;id&gt;</code> commands changes on every xray restart; IPv6 needs the adapter to already have a routable (non-link-local) address; and Windows doesn't classify xray's TUN adapter as "Remote Access," so the common built-in-Firewall killswitch trick doesn't apply to it. If TUN keeps giving you trouble, SOCKS mode paired with tun2socks, or another TUN implementation (sing-box/mihomo) in front of xray, are both more mature-tested paths — xray-core maintainers/contributors have said as much themselves.</div>
-      <div class="note"><b>The routing-loop risk is real and manual to avoid</b> — xray-core's own docs warn plainly: "You can't just route 0.0.0.0/0 through xray0 interface, as that will result Xray-core itself try to reach its uplink through xray0 interface, resulting infinite network loop." The generated commands below add a precise static route to your proxy server's own IP via your real gateway first, specifically to avoid this — but if your proxy address is a domain name rather than a raw IP, resolve it once yourself and use that IP in the route, since OS routing commands can't route by hostname.</div>
+    <div id="socksFields" class="grid">
+      <div class="field"><label>SOCKS port</label><input type="number" id="socksPort" value="10809"></div>
+      <div class="field"><label>HTTP port</label><input type="number" id="httpPort" value="10808"></div>
     </div>
-
-    <div class="checks" style="margin-top:16px;">
-      <label class="check"><input type="checkbox" id="optBypassPrivate" checked> Route private/LAN IPs directly (avoids proxying local traffic, helps prevent loops in TUN mode)</label>
-      <label class="check"><input type="checkbox" id="optBlockAds"> Block ad/tracker domains (<code>geosite:category-ads-all</code>)</label>
+    <div id="tunFields" class="grid" style="display:none;">
+      <div class="field"><label>Interface name</label><input type="text" id="tunName" value="xray0"></div>
+      <div class="field"><label>MTU</label><input type="number" id="tunMtu" value="1500"></div>
     </div>
+    <div class="note" id="tunNote" style="display:none;">xray-core's TUN inbound only brings the network interface up — it doesn't configure IP addressing or routing itself. After starting xray-core, you'll need to add routes at the OS level (<code>ip route</code> / <code>route add</code>, depending on platform). Also needs admin/root privileges, and on Windows, <code>wintun.dll</code> placed next to <code>xray.exe</code>.</div>
 
-    <div class="grid" style="margin-top:14px;">
-      <div class="field">
-        <label>DNS servers</label>
-        <input type="text" id="dnsServers" value="https://1.1.1.1/dns-query, https://dns.google/dns-query">
-      </div>
+    <div class="check"><label class="check"><input type="checkbox" id="bypassPrivate" checked> Route private/LAN IPs directly</label></div>
+    <div class="check"><label class="check"><input type="checkbox" id="blockAds"> Block ad/tracker domains</label></div>
+
+    <div class="grid" style="margin-top:12px;">
+      <div class="field"><label>DNS servers</label><input type="text" id="dnsServers" value="https://1.1.1.1/dns-query, https://dns.google/dns-query"></div>
       <div class="field"><label>Log level</label>
         <select id="logLevel">
           <option value="warning" selected>warning</option>
@@ -278,205 +129,36 @@ trojan://password@server2.example.com:443?security=tls&type=ws&host=cdn.example.
         </select>
       </div>
     </div>
-    <div class="checks" style="margin-top:10px;">
-      <label class="check"><input type="checkbox" id="optBlockDns53" checked> Block direct port-53 DNS (prevents apps/OS from leaking plaintext DNS queries around the tunnel — local LAN DNS servers stay reachable)</label>
-    </div>
-
-    <details class="adv">
-      <summary>Advanced options</summary>
-
-      <div class="adv-group">
-        <div class="adv-label">Traffic sniffing (inbound)</div>
-        <div class="checks">
-          <label class="check"><input type="checkbox" id="optSniffing" checked> Enable sniffing (reads SNI/Host from the first packet so routing/logs see the real domain)</label>
-          <label class="check"><input type="checkbox" id="optRouteOnly"> Route-only mode — use the sniffed domain for routing decisions only, keep proxying to the original IP (<code>routeOnly</code>)</label>
-          <label class="check"><input type="checkbox" id="optFakeDns"> Enable FakeDNS — hand out fake IPs locally so routing can match by domain without a real DNS round-trip first (useful with TUN)</label>
-        </div>
-      </div>
-
-      <div class="adv-group">
-        <div class="adv-label">Inbound access &amp; authentication</div>
-        <div class="grid">
-          <div class="field"><label>Listen address (SOCKS &amp; HTTP inbounds)</label>
-            <select id="listenAddress">
-              <option value="127.0.0.1" selected>127.0.0.1 (localhost only)</option>
-              <option value="0.0.0.0">0.0.0.0 (all interfaces / LAN-wide)</option>
-            </select>
-          </div>
-          <div class="field"><label>UDP over SOCKS</label>
-            <select id="socksUdp">
-              <option value="true" selected>enabled</option>
-              <option value="false">disabled</option>
-            </select>
-          </div>
-        </div>
-        <div class="checks" style="margin-top:12px;">
-          <label class="check"><input type="checkbox" id="optInboundAuth"> Require a username/password on the local SOCKS &amp; HTTP inbounds instead of open access</label>
-        </div>
-        <div class="grid" id="inboundAuthFields" style="display:none;margin-top:10px;">
-          <div class="field"><label>Username</label><input type="text" id="authUser" value="user"></div>
-          <div class="field"><label>Password</label><input type="text" id="authPass" value=""></div>
-        </div>
-        <div class="note" id="lanExposureNote" style="display:none;"><b>Heads up:</b> listening on 0.0.0.0 exposes this proxy to your whole LAN (and any network you join) with no password. Turn on the username/password requirement above before using this outside a trusted localhost-only setup.</div>
-      </div>
-
-      <div class="adv-group">
-        <div class="adv-label">TLS / REALITY security</div>
-        <div class="grid">
-          <div class="field"><label>Client fingerprint (uTLS)</label>
-            <select id="fpOverride">
-              <option value="" selected>Use whatever the link specifies</option>
-              <option value="chrome">chrome</option>
-              <option value="firefox">firefox</option>
-              <option value="safari">safari</option>
-              <option value="ios">ios</option>
-              <option value="android">android</option>
-              <option value="edge">edge</option>
-              <option value="random">random (one fixed fingerprint per connection, chosen randomly)</option>
-              <option value="randomized">randomized (fully randomized per connection)</option>
-            </select>
-          </div>
-        </div>
-        <div class="step-hint" style="margin:8px 0 0;">Overrides the <code>fingerprint</code> field on both <code>tlsSettings</code> and <code>realitySettings</code> for every server, regardless of what each individual link specified. Useful for making a batch of servers behave consistently, or matching a specific browser's TLS ClientHello shape.</div>
-
-        <div class="grid" style="margin-top:14px;">
-          <div class="field"><label>Pinned certificate SHA256 (optional, TLS only)</label><input type="text" id="certPin" placeholder="base64 hash, or multiple joined with ~"></div>
-          <div class="field"><label>ECH config (optional, TLS only)</label><input type="text" id="echConfig" placeholder="fixed ECHConfig string, or e.g. https://1.1.1.1/dns-query"></div>
-        </div>
-        <div class="step-hint" style="margin:8px 0 0;">
-          <b>Cert pinning</b> replaces normal certificate-chain trust with an exact match against this hash — get it with <code>xray tls hash --cert &lt;cert.pem&gt;</code>, <code>xray tls ping &lt;host:port&gt;</code>, or <code>openssl x509 -noout -fingerprint -sha256 -in cert.pem</code>. Stronger than <code>allowInsecure</code> since it still refuses anything that isn't <i>this exact</i> certificate, rather than accepting anything.<br>
-          <b>ECH</b> hides the SNI from network-level observers (deeper than REALITY's camouflage, which still leaks the disguise domain in plaintext at the TCP/TLS layer for some analysis methods). Only applies to plain TLS security, not REALITY — REALITY already has its own SNI-camouflage mechanism.
-        </div>
-      </div>
-
-      <div class="adv-group">
-        <div class="adv-label">Mux (connection multiplexing)</div>
-        <div class="checks">
-          <label class="check"><input type="checkbox" id="optMux"> Enable Mux on the proxy outbound</label>
-        </div>
-        <div class="grid" id="muxFields" style="display:none;margin-top:10px;">
-          <div class="field"><label>Concurrency (1–128)</label><input type="number" id="muxConcurrency" value="8" min="1" max="128"></div>
-          <div class="field"><label>UDP/443 (QUIC) handling</label>
-            <select id="muxXudp443">
-              <option value="reject" selected>reject (default — forces QUIC to fall back to TCP)</option>
-              <option value="allow">allow</option>
-              <option value="skip">skip</option>
-            </select>
-          </div>
-        </div>
-        <div class="note" id="muxVisionNote" style="display:none;"><b>Heads up:</b> this server uses XTLS Vision flow, which is generally recommended to run <i>without</i> Mux (Mux breaks Vision's direct TCP splicing). Consider leaving this off unless you know you need it.</div>
-      </div>
-
-      <div class="adv-group">
-        <div class="adv-label">Fragment (TLS ClientHello fragmentation, anti-censorship)</div>
-
-        <div class="checks">
-          <label class="check"><input type="checkbox" id="optFragment"> Fragment outgoing TLS handshakes on the direct outbound</label>
-        </div>
-        <div class="grid" id="fragmentFields" style="display:none;margin-top:10px;">
-          <div class="field"><label>Packets</label><input type="text" id="fragPackets" value="tlshello"></div>
-          <div class="field"><label>Length</label><input type="text" id="fragLength" value="100-200"></div>
-          <div class="field"><label>Interval (ms)</label><input type="text" id="fragInterval" value="10-20"></div>
-        </div>
-      </div>
-
-      <div class="adv-group">
-        <div class="adv-label">DNS &amp; routing strategy</div>
-        <div class="grid">
-          <div class="field"><label>DNS query strategy</label>
-            <select id="dnsQueryStrategy">
-              <option value="" selected>(default)</option>
-              <option value="UseIP">UseIP</option>
-              <option value="UseIPv4">UseIPv4</option>
-              <option value="UseIPv6">UseIPv6</option>
-            </select>
-          </div>
-          <div class="field"><label>Routing domain strategy</label>
-            <select id="routingDomainStrategy">
-              <option value="IPIfNonMatch" selected>IPIfNonMatch</option>
-              <option value="AsIs">AsIs</option>
-              <option value="IPOnDemand">IPOnDemand</option>
-            </select>
-          </div>
-          <div class="field"><label>Freedom (direct) outbound resolution</label>
-            <select id="freedomDomainStrategy">
-              <option value="UseIP" selected>UseIP</option>
-              <option value="AsIs">AsIs</option>
-              <option value="UseIPv4">UseIPv4</option>
-              <option value="UseIPv6">UseIPv6</option>
-              <option value="ForceIP">ForceIP</option>
-              <option value="ForceIPv4">ForceIPv4</option>
-              <option value="ForceIPv6">ForceIPv6</option>
-            </select>
-          </div>
-          <div class="field"><label>DNS cache</label>
-            <select id="dnsDisableCache">
-              <option value="false" selected>enabled (default)</option>
-              <option value="true">disabled</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div class="adv-group">
-        <div class="adv-label">Custom domain routing (optional — one entry per line, or comma-separated)</div>
-        <div class="step-hint" style="margin:0 0 10px;">Paste bare domains (<code>example.com</code>), or prefixed matchers (<code>domain:</code>/<code>full:</code>/<code>keyword:</code>/<code>regexp:</code>/<code>geosite:</code>). Full URLs like <code>https://example.com/</code> are auto-cleaned to just the hostname — domain routing matches against sniffed SNI/Host values, which never include a scheme or path.</div>
-        <div class="grid">
-          <div class="field">
-            <label>Always via proxy</label>
-            <textarea id="customProxyDomains" style="min-height:70px;"></textarea>
-            <div class="domain-preview" id="customProxyDomainsPreview"></div>
-          </div>
-          <div class="field">
-            <label>Always direct</label>
-            <textarea id="customDirectDomains" style="min-height:70px;"></textarea>
-            <div class="domain-preview" id="customDirectDomainsPreview"></div>
-          </div>
-        </div>
-      </div>
-    </details>
   </section>
 
-  <!-- STEP 4: OUTPUT -->
-  <section class="step" id="outputSection" style="display:none;">
-    <div class="step-head"><span class="step-num">04</span><span class="step-title">Generated config</span></div>
+  <section id="outputSection" style="display:none;">
+    <h2>4. Config</h2>
     <div id="outputWarning"></div>
-    <div class="row" style="margin-top:0;margin-bottom:12px;">
+    <div class="row" style="margin-top:0;margin-bottom:10px;">
       <button class="primary" id="genBtn">Generate config.json</button>
-      <button class="small" id="copyBtn" style="display:none;">Copy</button>
-      <button class="small" id="downloadBtn" style="display:none;">Download config.json</button>
+      <button id="copyBtn" style="display:none;">Copy</button>
+      <button id="downloadBtn" style="display:none;">Download</button>
     </div>
     <pre id="output" style="display:none;"></pre>
   </section>
 
-  <section class="step" id="tunCommandsSection" style="display:none;">
-    <div class="step-head"><span class="step-num">05</span><span class="step-title">OS routing commands (TUN mode only)</span></div>
-    <div class="step-hint" style="margin:0 0 10px;">xray-core's TUN inbound only brings the interface up — it does not configure addressing or routing itself. Run these on the machine running xray-core, <b>after</b> starting it (the interface has to exist first), to actually route traffic through it without creating a loop.</div>
-    <div class="row" style="margin-top:0;margin-bottom:12px;">
-      <button class="small" id="copyTunCmdBtn">Copy commands</button>
-    </div>
-    <pre id="tunCommands"></pre>
-  </section>
-
-  <footer>
-    Client-side only — links and keys never leave this page. Verify the generated config against your installed xray-core version before deploying, since TUN and Hysteria2 support vary between releases.
-  </footer>
+  <footer>Client-side only — nothing is sent anywhere.</footer>
 </div>
 
 <script>
 (function(){
 
-// ---------- helpers ----------
+// ---------- small helpers ----------
 function b64decode(str){
   str = str.replace(/-/g,'+').replace(/_/g,'/').trim();
   while(str.length % 4) str += '=';
-  try{
-    const bin = atob(str);
+  try{ const bin = atob(str);
     try{ return decodeURIComponent(Array.prototype.map.call(bin, c => '%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join('')); }
     catch(e){ return bin; }
   }catch(e){ return null; }
 }
 function looksBase64(s){ return /^[A-Za-z0-9+/_-]+={0,2}$/.test(s) && s.length > 20; }
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function splitLinkParts(link, schemeLen){
   let body = link.slice(schemeLen);
@@ -489,50 +171,58 @@ function splitLinkParts(link, schemeLen){
   if(body.endsWith('/')) body = body.slice(0,-1);
   return {body, query, remark};
 }
-
 function splitHostPort(hostport){
-  let m = hostport.match(/^\[(.+)\]:(\d+)$/); // ipv6
+  let m = hostport.match(/^\[(.+)\]:(\d+)$/);
   if(m) return {address: m[1], port: parseInt(m[2],10)};
   m = hostport.match(/^(.+):(\d+)$/);
   if(m) return {address: m[1], port: parseInt(m[2],10)};
   return {address: hostport, port: 443};
 }
-
 function splitUserAtHost(body){
   const atIdx = body.lastIndexOf('@');
   if(atIdx < 0) return null;
   return { userinfo: body.slice(0, atIdx), hostport: body.slice(atIdx+1) };
 }
-
 let serverIdCounter = 0;
 
-// ---------- protocol parsers ----------
+// ---------- parsers ----------
+function extractTransport(query, fallbackHost, defaultSecurity){
+  const security = query.get('security') || defaultSecurity || 'none';
+  const network = query.get('type') || 'tcp';
+  const sni = query.get('sni') || query.get('host') || fallbackHost;
+  return {
+    security, network, sni, fp: query.get('fp') || 'chrome',
+    alpn: query.get('alpn') || '', host: query.get('host') || '',
+    path: query.get('path') ? decodeURIComponent(query.get('path')) : '/',
+    serviceName: query.get('serviceName') || query.get('path') || '',
+    headerType: query.get('headerType') || 'none',
+    pbk: query.get('pbk') || '', sid: query.get('sid') || '', spx: query.get('spx') || '',
+    allowInsecure: query.get('allowInsecure') === '1'
+  };
+}
+
 function parseVless(link){
   const {body, query, remark} = splitLinkParts(link, 'vless://'.length);
   const parts = splitUserAtHost(body);
   if(!parts) throw new Error('vless: missing user@host');
   const {address, port} = splitHostPort(decodeURIComponent(parts.hostport));
   return {
-    id: ++serverIdCounter, protocol:'vless', remark: remark || address, address, port, raw: link,
-    uuid: decodeURIComponent(parts.userinfo),
-    flow: query.get('flow') || '',
+    id: ++serverIdCounter, protocol:'vless', remark: remark || address, address, port,
+    uuid: decodeURIComponent(parts.userinfo), flow: query.get('flow') || '',
     encryption: query.get('encryption') ? decodeURIComponent(query.get('encryption')) : 'none',
     transport: extractTransport(query, address)
   };
 }
-
 function parseTrojan(link){
   const {body, query, remark} = splitLinkParts(link, 'trojan://'.length);
   const parts = splitUserAtHost(body);
   if(!parts) throw new Error('trojan: missing user@host');
   const {address, port} = splitHostPort(decodeURIComponent(parts.hostport));
   return {
-    id: ++serverIdCounter, protocol:'trojan', remark: remark || address, address, port, raw: link,
-    password: decodeURIComponent(parts.userinfo),
-    transport: extractTransport(query, address, 'tls') // trojan defaults to tls
+    id: ++serverIdCounter, protocol:'trojan', remark: remark || address, address, port,
+    password: decodeURIComponent(parts.userinfo), transport: extractTransport(query, address, 'tls')
   };
 }
-
 function parseVmess(link){
   let payload = link.slice('vmess://'.length);
   const hashIdx = payload.indexOf('#');
@@ -542,7 +232,6 @@ function parseVmess(link){
   try{ j = JSON.parse(decoded); }catch(e){ throw new Error('vmess: could not decode base64 JSON payload'); }
   const query = new URLSearchParams();
   if(j.net) query.set('type', j.net);
-  if(j.type) query.set('headerType', j.type);
   if(j.host) query.set('host', j.host);
   if(j.path) query.set('path', j.path);
   if(j.tls) query.set('security', j.tls === 'tls' ? 'tls' : (j.tls === 'reality' ? 'reality' : 'none'));
@@ -551,12 +240,10 @@ function parseVmess(link){
   if(j.fp) query.set('fp', j.fp);
   if(j.path && j.net === 'grpc') query.set('serviceName', j.path);
   return {
-    id: ++serverIdCounter, protocol:'vmess', remark: j.ps || j.add, address: j.add, port: parseInt(j.port,10), raw: link,
-    uuid: j.id, alterId: parseInt(j.aid || 0, 10), cipher: j.scy || 'auto',
-    transport: extractTransport(query, j.add)
+    id: ++serverIdCounter, protocol:'vmess', remark: j.ps || j.add, address: j.add, port: parseInt(j.port,10),
+    uuid: j.id, cipher: j.scy || 'auto', transport: extractTransport(query, j.add)
   };
 }
-
 function parseShadowsocks(link){
   const {body, query, remark} = splitLinkParts(link, 'ss://'.length);
   const parts = splitUserAtHost(body);
@@ -564,12 +251,8 @@ function parseShadowsocks(link){
   if(parts){
     let userinfo = parts.userinfo;
     const decoded = looksBase64(userinfo) ? b64decode(userinfo) : decodeURIComponent(userinfo);
-    if(decoded && decoded.includes(':')){
-      const ci = decoded.indexOf(':');
-      method = decoded.slice(0, ci); password = decoded.slice(ci+1);
-    } else {
-      throw new Error('ss: could not parse method:password');
-    }
+    if(decoded && decoded.includes(':')){ const ci = decoded.indexOf(':'); method = decoded.slice(0, ci); password = decoded.slice(ci+1); }
+    else throw new Error('ss: could not parse method:password');
     ({address, port} = splitHostPort(decodeURIComponent(parts.hostport)));
   } else {
     const decoded = b64decode(body);
@@ -578,9 +261,8 @@ function parseShadowsocks(link){
     if(!m) throw new Error('ss: unrecognized legacy format');
     method = m[1]; password = m[2]; address = m[3]; port = parseInt(m[4],10);
   }
-  return { id: ++serverIdCounter, protocol:'shadowsocks', remark: remark || address, address, port, raw: link, method, password };
+  return { id: ++serverIdCounter, protocol:'shadowsocks', remark: remark || address, address, port, method, password };
 }
-
 function parseHysteria2(link){
   const scheme = link.startsWith('hy2://') ? 'hy2://' : 'hysteria2://';
   const {body, query, remark} = splitLinkParts(link, scheme.length);
@@ -589,52 +271,10 @@ function parseHysteria2(link){
   const auth = parts ? decodeURIComponent(parts.userinfo) : '';
   const {address, port} = splitHostPort(decodeURIComponent(hostport));
   return {
-    id: ++serverIdCounter, protocol:'hysteria', remark: remark || address, address, port, raw: link,
-    auth,
-    sni: query.get('sni') || query.get('peer') || address,
-    insecure: query.get('insecure') === '1',
-    obfs: query.get('obfs') || '',
-    obfsPassword: query.get('obfs-password') || ''
+    id: ++serverIdCounter, protocol:'hysteria', remark: remark || address, address, port, auth,
+    sni: query.get('sni') || query.get('peer') || address, insecure: query.get('insecure') === '1'
   };
 }
-
-function parseTuic(link){
-  const {body, query, remark} = splitLinkParts(link, 'tuic://'.length);
-  const parts = splitUserAtHost(body);
-  if(!parts) throw new Error('tuic: missing user@host');
-  const ci = parts.userinfo.indexOf(':');
-  const uuid = ci >= 0 ? parts.userinfo.slice(0, ci) : parts.userinfo;
-  const password = ci >= 0 ? decodeURIComponent(parts.userinfo.slice(ci+1)) : '';
-  const {address, port} = splitHostPort(decodeURIComponent(parts.hostport));
-  return {
-    id: ++serverIdCounter, protocol:'tuic', remark: remark || address, address, port, raw: link,
-    uuid, password,
-    congestionControl: query.get('congestion_control') || 'bbr',
-    sni: query.get('sni') || address,
-    allowInsecure: query.get('allow_insecure') === '1'
-  };
-}
-
-function extractTransport(query, fallbackHost, defaultSecurity){
-  const security = query.get('security') || defaultSecurity || 'none';
-  const network = query.get('type') || 'tcp';
-  const sni = query.get('sni') || query.get('host') || fallbackHost;
-  return {
-    security, network,
-    sni, fp: query.get('fp') || 'chrome',
-    alpn: query.get('alpn') || '',
-    host: query.get('host') || '',
-    path: query.get('path') ? decodeURIComponent(query.get('path')) : '/',
-    serviceName: query.get('serviceName') || query.get('path') || '',
-    headerType: query.get('headerType') || 'none',
-    pbk: query.get('pbk') || '',
-    sid: query.get('sid') || '',
-    spx: query.get('spx') || '',
-    seed: query.get('seed') || '',
-    allowInsecure: query.get('allowInsecure') === '1'
-  };
-}
-
 function parseAnyLink(link){
   link = link.trim();
   if(link.startsWith('vless://')) return parseVless(link);
@@ -642,39 +282,26 @@ function parseAnyLink(link){
   if(link.startsWith('trojan://')) return parseTrojan(link);
   if(link.startsWith('ss://')) return parseShadowsocks(link);
   if(link.startsWith('hysteria2://') || link.startsWith('hy2://')) return parseHysteria2(link);
-  if(link.startsWith('tuic://')) return parseTuic(link);
-  throw new Error('Unrecognized scheme: ' + link.slice(0, 12) + '...');
+  if(link.startsWith('tuic://')) throw new Error('TUIC is not supported by xray-core (no outbound implementation exists) — use sing-box for this link.');
+  throw new Error('Unrecognized scheme: ' + link.slice(0, 14) + '...');
 }
 
-// ---------- stream settings builder (vless/vmess/trojan) ----------
-// Reflects current xray-core schema: "raw" replaces the old "tcp" name (rawSettings),
-// "websocket" replaces "ws" (wsSettings key unchanged), the old "http"/"h2" transport was
-// removed entirely in favor of XHTTP, and mKCP dropped its header/seed fields (now handled
-// by the separate FinalMask layer, which this generator does not attempt to reconstruct
-// from a share-link since there's no established URI convention for it yet).
-function buildStreamSettings(t, fpOverride, tlsExtra){
-  const fp = fpOverride || t.fp;
+// ---------- streamSettings / outbound builders (current xray-core schema) ----------
+function buildStreamSettings(t){
   const ss = { network: t.network };
   if(t.security === 'tls'){
     ss.security = 'tls';
-    ss.tlsSettings = { serverName: t.sni, fingerprint: fp };
+    ss.tlsSettings = { serverName: t.sni, fingerprint: t.fp };
     if(t.alpn) ss.tlsSettings.alpn = t.alpn.split(',');
-    // allowInsecure is deprecated in current xray-core (migrated toward pinnedPeerCertSha256),
-    // but still documented and functional, so only emit it when the link actually asked for it.
     if(t.allowInsecure) ss.tlsSettings.allowInsecure = true;
-    if(tlsExtra && tlsExtra.pinnedPeerCertSha256) ss.tlsSettings.pinnedPeerCertSha256 = tlsExtra.pinnedPeerCertSha256;
-    if(tlsExtra && tlsExtra.echConfigList) ss.tlsSettings.echConfigList = tlsExtra.echConfigList;
   } else if(t.security === 'reality'){
     ss.security = 'reality';
-    // Client-side REALITY field was renamed publicKey -> password in current xray-core.
-    ss.realitySettings = { serverName: t.sni, fingerprint: fp, password: t.pbk, shortId: t.sid || '', spiderX: t.spx || '' };
+    ss.realitySettings = { serverName: t.sni, fingerprint: t.fp, password: t.pbk, shortId: t.sid || '', spiderX: t.spx || '' };
   } else {
     ss.security = 'none';
   }
-
   switch(t.network){
-    case 'ws':
-    case 'websocket':
+    case 'ws': case 'websocket':
       ss.network = 'websocket';
       ss.wsSettings = { path: t.path || '/' };
       if(t.host) ss.wsSettings.host = t.host;
@@ -682,27 +309,17 @@ function buildStreamSettings(t, fpOverride, tlsExtra){
     case 'grpc':
       ss.grpcSettings = { serviceName: t.serviceName || '', multiMode: false };
       break;
-    case 'http':
-    case 'h2':
-      // Removed from xray-core; XHTTP is the direct replacement and covers H2 & H3.
+    case 'http': case 'h2': // removed from xray-core; XHTTP is the direct replacement
+    case 'xhttp': case 'splithttp':
       ss.network = 'xhttp';
       ss.xhttpSettings = { path: t.path || '/', host: t.host || t.sni, mode: 'auto' };
       break;
     case 'httpupgrade':
       ss.httpupgradeSettings = { path: t.path || '/', host: t.host || t.sni };
       break;
-    case 'xhttp':
-    case 'splithttp':
-      ss.network = 'xhttp';
-      ss.xhttpSettings = { path: t.path || '/', host: t.host || t.sni, mode: 'auto' };
-      break;
-    case 'kcp':
-    case 'mkcp':
+    case 'kcp': case 'mkcp':
       ss.network = 'mkcp';
-      ss.kcpSettings = {
-        mtu: 1350, tti: 20, uplinkCapacity: 5, downlinkCapacity: 20,
-        congestion: false, readBufferSize: 2, writeBufferSize: 2
-      };
+      ss.kcpSettings = { mtu: 1350, tti: 20, uplinkCapacity: 5, downlinkCapacity: 20, congestion: false, readBufferSize: 2, writeBufferSize: 2 };
       break;
     case 'quic':
       ss.quicSettings = { security: 'none', key: '', header: { type: t.headerType || 'none' } };
@@ -716,265 +333,83 @@ function buildStreamSettings(t, fpOverride, tlsExtra){
   return ss;
 }
 
-// ---------- outbound builders ----------
-// Current xray-core outbound settings are flat single-endpoint objects (address/port/...
-// directly under "settings"), not the old vnext/servers arrays. The core now enforces one
-// endpoint per outbound and expects routing/balancers for multi-server setups.
-function buildOutbound(server, tag, fpOverride, tlsExtra){
+function buildOutbound(server, tag){
   switch(server.protocol){
     case 'vless':
-      return {
-        protocol: 'vless', tag,
-        settings: {
-          address: server.address, port: server.port, id: server.uuid,
-          encryption: server.encryption || 'none',
-          flow: server.flow || undefined,
-          level: 0
-        },
-        streamSettings: buildStreamSettings(server.transport, fpOverride, tlsExtra)
-      };
+      return { protocol: 'vless', tag,
+        settings: { address: server.address, port: server.port, id: server.uuid, encryption: server.encryption || 'none', flow: server.flow || undefined, level: 0 },
+        streamSettings: buildStreamSettings(server.transport) };
     case 'vmess':
-      return {
-        protocol: 'vmess', tag,
+      return { protocol: 'vmess', tag,
         settings: { address: server.address, port: server.port, id: server.uuid, security: server.cipher || 'auto', level: 0 },
-        streamSettings: buildStreamSettings(server.transport, fpOverride, tlsExtra)
-      };
+        streamSettings: buildStreamSettings(server.transport) };
     case 'trojan':
-      return {
-        protocol: 'trojan', tag,
+      return { protocol: 'trojan', tag,
         settings: { address: server.address, port: server.port, password: server.password, level: 0 },
-        streamSettings: buildStreamSettings(server.transport, fpOverride, tlsExtra)
-      };
+        streamSettings: buildStreamSettings(server.transport) };
     case 'shadowsocks':
-      return {
-        protocol: 'shadowsocks', tag,
-        settings: { address: server.address, port: server.port, method: server.method, password: server.password, level: 0 }
-      };
+      return { protocol: 'shadowsocks', tag,
+        settings: { address: server.address, port: server.port, method: server.method, password: server.password, level: 0 } };
     case 'hysteria':
-      return {
-        protocol: 'hysteria', tag,
-        // OutboundConfigurationObject for hysteria is intentionally minimal — version/address/port only.
-        // Auth and TLS behavior live entirely in streamSettings.hysteriaSettings / tlsSettings.
+      return { protocol: 'hysteria', tag,
         settings: { version: 2, address: server.address, port: server.port },
-        streamSettings: {
-          network: 'hysteria', security: 'tls',
-          tlsSettings: Object.assign(
-            { serverName: server.sni, alpn: ['h3'] },
-            fpOverride ? { fingerprint: fpOverride } : {},
-            server.insecure ? { allowInsecure: true } : {},
-            (tlsExtra && tlsExtra.pinnedPeerCertSha256) ? { pinnedPeerCertSha256: tlsExtra.pinnedPeerCertSha256 } : {},
-            (tlsExtra && tlsExtra.echConfigList) ? { echConfigList: tlsExtra.echConfigList } : {}
-          ),
-          hysteriaSettings: { version: 2, auth: server.auth, udpIdleTimeout: 60 }
-        }
-      };
-    case 'tuic':
-      return null; // unsupported by xray-core
-    default:
-      return null;
+        streamSettings: { network: 'hysteria', security: 'tls',
+          tlsSettings: Object.assign({ serverName: server.sni, alpn: ['h3'] }, server.insecure ? { allowInsecure: true } : {}),
+          hysteriaSettings: { version: 2, auth: server.auth, udpIdleTimeout: 60 } } };
+    default: return null;
   }
 }
 
 // ---------- config assembly ----------
 function buildConfig(server, opts){
-  const outbound = buildOutbound(server, 'proxy', opts.fpOverride, { pinnedPeerCertSha256: opts.certPin, echConfigList: opts.echConfig });
-  if(!outbound) throw new Error('unsupported');
+  const outbound = buildOutbound(server, 'proxy');
+  if(!outbound) throw new Error('unsupported protocol');
 
-  // Mux: current xray-core schema is {enabled, concurrency, xudpConcurrency, xudpProxyUDP443}.
-  // Concurrency < 0 fully disables mux even if enabled:true, so we only attach the object at all when requested.
-  if(opts.mux && opts.mux.enabled){
-    outbound.mux = {
-      enabled: true,
-      concurrency: opts.mux.concurrency || 8,
-      xudpConcurrency: 8,
-      xudpProxyUDP443: opts.mux.xudpProxyUDP443 || 'reject'
-    };
-  }
-
-  const destOverride = ['http', 'tls', 'quic'];
-  if(opts.fakeDns) destOverride.push('fakedns');
-  const sniffing = {
-    enabled: opts.sniffingEnabled !== false,
-    destOverride,
-    routeOnly: !!opts.routeOnly
-  };
-
+  const sniffing = { enabled: true, destOverride: ['http','tls','quic'] };
   const inbounds = [];
   if(opts.mode === 'socks'){
-    const socksSettings = { udp: opts.socksUdp !== false, ip: '127.0.0.1' };
-    const httpSettings = {};
-    if(opts.inboundAuth && opts.inboundAuth.enabled){
-      socksSettings.auth = 'password';
-      // NOTE: the correct field name here is "users", not "accounts" — using "accounts" is a
-      // real, confirmed community pitfall (XTLS/Xray-core#4487, #5943): the config still parses
-      // fine, but xray-core silently ignores the block and the inbound stays wide open.
-      socksSettings.users = [{ user: opts.inboundAuth.user, pass: opts.inboundAuth.pass }];
-      httpSettings.users = [{ user: opts.inboundAuth.user, pass: opts.inboundAuth.pass }];
-    } else {
-      socksSettings.auth = 'noauth';
-    }
-    inbounds.push({ tag: 'socks-in', listen: opts.listenAddress || '127.0.0.1', port: opts.socksPort, protocol: 'socks', settings: socksSettings, sniffing });
-    inbounds.push({ tag: 'http-in', listen: opts.listenAddress || '127.0.0.1', port: opts.httpPort, protocol: 'http', settings: httpSettings, sniffing });
+    inbounds.push({ tag: 'socks-in', listen: '127.0.0.1', port: opts.socksPort, protocol: 'socks', settings: { auth: 'noauth', udp: true, ip: '127.0.0.1' }, sniffing });
+    inbounds.push({ tag: 'http-in', listen: '127.0.0.1', port: opts.httpPort, protocol: 'http', settings: {}, sniffing });
   } else {
-    // xray-core's own proxy/tun/README.md is explicit: "Current implementation does not
-    // contain options to configure network level addresses, routing or rules. Enabling the
-    // feature will result only tun interface up, and that's it." name + MTU are the only
-    // real settings fields — everything else must be configured at the OS level, outside
-    // this JSON entirely (see the companion routing commands generated alongside this config).
-    const tunSettings = { name: opts.tunName || 'xray0', MTU: opts.tunMtu || 1500 };
-    inbounds.push({ tag: 'tun-in', protocol: 'tun', settings: tunSettings, sniffing });
+    // xray-core's own proxy/tun/README.md: name + MTU are the only real settings fields.
+    // No gateway/dns/auto-route options exist — routing must be configured at the OS level.
+    inbounds.push({ tag: 'tun-in', protocol: 'tun', settings: { name: opts.tunName || 'xray0', MTU: opts.tunMtu || 1500 }, sniffing });
   }
 
   const rules = [];
   if(opts.bypassPrivate) rules.push({ type: 'field', ip: ['geoip:private'], outboundTag: 'direct' });
-  // DNS leak protection: block anything trying to speak raw DNS on port 53 (bypassing xray's own
-  // configured resolver above) rather than allowing it through unencrypted. geoip:private already
-  // matched above, so LAN-local DNS servers stay reachable.
-  if(opts.blockDns53) rules.push({ type: 'field', port: '53', network: 'udp,tcp', outboundTag: 'block' });
-  if(opts.customProxyDomains && opts.customProxyDomains.length) rules.push({ type: 'field', domain: opts.customProxyDomains, outboundTag: 'proxy' });
-  if(opts.customDirectDomains && opts.customDirectDomains.length) rules.push({ type: 'field', domain: opts.customDirectDomains, outboundTag: 'direct' });
   if(opts.blockAds) rules.push({ type: 'field', domain: ['geosite:category-ads-all'], outboundTag: 'block' });
-
-  const dnsServers = opts.dnsList.length ? [...opts.dnsList] : ['1.1.1.1', 'localhost'];
-  if(opts.fakeDns) dnsServers.unshift('fakedns');
-  const dns = { servers: dnsServers };
-  if(opts.dnsQueryStrategy) dns.queryStrategy = opts.dnsQueryStrategy;
-  if(opts.dnsDisableCache) dns.disableCache = true;
-
-  const directSettings = { domainStrategy: opts.freedomDomainStrategy || 'UseIP' };
-  if(opts.fragment && opts.fragment.enabled){
-    directSettings.fragment = {
-      packets: opts.fragment.packets || 'tlshello',
-      length: opts.fragment.length || '100-200',
-      interval: opts.fragment.interval || '10-20'
-    };
-  }
-
-  const directOutbound = { tag: 'direct', protocol: 'freedom', settings: directSettings };
-  // sendThrough is a manual fallback for the routing-loop problem TUN mode can hit — most
-  // commonly reported on Windows, where autoOutboundsInterface doesn't always reliably bind
-  // xray's own egress traffic to the physical adapter. Only meaningful (and only emitted) in TUN mode.
-  if(opts.mode === 'tun' && opts.tunSendThrough){
-    outbound.sendThrough = opts.tunSendThrough;
-    directOutbound.sendThrough = opts.tunSendThrough;
-  }
 
   return {
     log: { loglevel: opts.logLevel },
-    dns,
+    dns: { servers: opts.dnsList.length ? opts.dnsList : ['https://1.1.1.1/dns-query'] },
     inbounds,
     outbounds: [
       outbound,
-      directOutbound,
+      { tag: 'direct', protocol: 'freedom', settings: { domainStrategy: 'UseIP' } },
       { tag: 'block', protocol: 'blackhole', settings: {} }
     ],
-    routing: { domainStrategy: opts.routingDomainStrategy || 'IPIfNonMatch', rules }
+    routing: { domainStrategy: 'IPIfNonMatch', rules }
   };
 }
 
-// ---------- syntax highlight for output ----------
+// ---------- syntax highlight ----------
 function highlight(json){
-  return json
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  return json.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/(&quot;|")([^"\n]*?)\1(\s*:)/g, '<span class="tok-key">$1$2$1</span>$3')
     .replace(/:\s*"([^"\n]*)"/g, ': <span class="tok-str">"$1"</span>')
     .replace(/:\s*(-?\d+(\.\d+)?)/g, ': <span class="tok-num">$1</span>')
     .replace(/:\s*(true|false|null)/g, ': <span class="tok-bool">$1</span>');
 }
 
-// ---------- round-trip import: inverse of buildStreamSettings/buildOutbound ----------
-function transportFromStreamSettings(ss){
-  ss = ss || {};
-  const network = ss.network || 'raw';
-  const security = ss.security || 'none';
-  let sni = '', fp = '', alpn = '', host = '', path = '/', serviceName = '', headerType = 'none', pbk = '', sid = '', spx = '', allowInsecure = false;
+// ---------- state & UI wiring ----------
+let parsedServers = [], selectedId = null, currentMode = 'socks';
 
-  if(security === 'tls' && ss.tlsSettings){
-    sni = ss.tlsSettings.serverName || '';
-    fp = ss.tlsSettings.fingerprint || '';
-    if(Array.isArray(ss.tlsSettings.alpn)) alpn = ss.tlsSettings.alpn.join(',');
-    allowInsecure = !!ss.tlsSettings.allowInsecure;
-  } else if(security === 'reality' && ss.realitySettings){
-    sni = ss.realitySettings.serverName || '';
-    fp = ss.realitySettings.fingerprint || '';
-    pbk = ss.realitySettings.password || ss.realitySettings.publicKey || ''; // accept either current or old field name on import
-    sid = ss.realitySettings.shortId || '';
-    spx = ss.realitySettings.spiderX || '';
-  }
-
-  if((network === 'websocket' || network === 'ws') && ss.wsSettings){
-    path = ss.wsSettings.path || '/';
-    host = ss.wsSettings.host || (ss.wsSettings.headers && ss.wsSettings.headers.Host) || ''; // accept the old headers.Host form too, for configs from before this fix
-  } else if(network === 'grpc' && ss.grpcSettings){
-    serviceName = ss.grpcSettings.serviceName || '';
-  } else if(network === 'xhttp' && ss.xhttpSettings){
-    path = ss.xhttpSettings.path || '/';
-    host = ss.xhttpSettings.host || '';
-  } else if(network === 'httpupgrade' && ss.httpupgradeSettings){
-    path = ss.httpupgradeSettings.path || '/';
-    host = ss.httpupgradeSettings.host || '';
-  } else if((network === 'raw' || network === 'tcp') && ss.rawSettings){
-    const h = ss.rawSettings.header || (ss.tcpSettings && ss.tcpSettings.header);
-    if(h && h.type === 'http'){
-      headerType = 'http';
-      path = (h.request && h.request.path && h.request.path[0]) || '/';
-      host = (h.request && h.request.headers && h.request.headers.Host && h.request.headers.Host[0]) || '';
-    }
-  }
-
-  return { security, network, sni, fp, alpn, host, path, serviceName, headerType, pbk, sid, spx, seed: '', allowInsecure };
-}
-
-function serverFromOutbound(ob){
-  const proto = ob.protocol;
-  const s = ob.settings || {};
-  const ss = ob.streamSettings || {};
-  const base = { id: ++serverIdCounter, raw: '(imported from config.json)' };
-  switch(proto){
-    case 'vless':
-      return Object.assign(base, {
-        protocol: 'vless', remark: 'Imported VLESS — ' + s.address, address: s.address, port: s.port,
-        uuid: s.id, flow: s.flow || '', encryption: s.encryption || 'none', transport: transportFromStreamSettings(ss)
-      });
-    case 'vmess':
-      return Object.assign(base, {
-        protocol: 'vmess', remark: 'Imported VMess — ' + s.address, address: s.address, port: s.port,
-        uuid: s.id, cipher: s.security || 'auto', transport: transportFromStreamSettings(ss)
-      });
-    case 'trojan':
-      return Object.assign(base, {
-        protocol: 'trojan', remark: 'Imported Trojan — ' + s.address, address: s.address, port: s.port,
-        password: s.password, transport: transportFromStreamSettings(ss)
-      });
-    case 'shadowsocks':
-      return Object.assign(base, {
-        protocol: 'shadowsocks', remark: 'Imported Shadowsocks — ' + s.address, address: s.address, port: s.port,
-        method: s.method, password: s.password
-      });
-    case 'hysteria': {
-      const hs = ss.hysteriaSettings || {};
-      const tls = ss.tlsSettings || {};
-      return Object.assign(base, {
-        protocol: 'hysteria', remark: 'Imported Hysteria2 — ' + s.address, address: s.address, port: s.port,
-        auth: hs.auth || '', sni: tls.serverName || s.address, insecure: !!tls.allowInsecure
-      });
-    }
-    default:
-      return null; // e.g. wireguard/socks/http outbounds — not a link protocol this tool round-trips
-  }
-}
-
-// ---------- state ----------
-let parsedServers = [];
-let selectedId = null;
-
-// ---------- UI wiring ----------
 const linkInput = document.getElementById('linkInput');
 const parseBtn = document.getElementById('parseBtn');
-const clearBtn = document.getElementById('clearBtn');
 const parseSummary = document.getElementById('parseSummary');
 const parseErrors = document.getElementById('parseErrors');
-const serversSection = document.getElementById('serversSection');
+const serverSection = document.getElementById('serverSection');
 const serverList = document.getElementById('serverList');
 const optionsSection = document.getElementById('optionsSection');
 const outputSection = document.getElementById('outputSection');
@@ -984,24 +419,17 @@ const genBtn = document.getElementById('genBtn');
 const copyBtn = document.getElementById('copyBtn');
 const downloadBtn = document.getElementById('downloadBtn');
 
-function setFlowStep(n){
-  document.querySelectorAll('.flow .node').forEach(el => el.classList.toggle('active', parseInt(el.dataset.n,10) <= n));
-  document.getElementById('ln1').classList.toggle('active', n >= 2);
-  document.getElementById('ln2').classList.toggle('active', n >= 3);
-  document.getElementById('ln3').classList.toggle('active', n >= 4);
-}
-
 parseBtn.addEventListener('click', () => {
   const raw = linkInput.value.trim();
   parseErrors.innerHTML = '';
-  if(!raw){ parseSummary.textContent = 'Paste at least one link first.'; return; }
+  if(!raw){ parseSummary.textContent = 'Paste a link first.'; return; }
 
   let lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   const schemes = ['vless://','vmess://','trojan://','ss://','hysteria2://','hy2://','tuic://'];
   const anyScheme = lines.some(l => schemes.some(s => l.startsWith(s)));
   if(!anyScheme && lines.length === 1 && looksBase64(lines[0])){
     const decoded = b64decode(lines[0]);
-    if(decoded){ lines = decoded.split('\n').map(l => l.trim()).filter(Boolean); }
+    if(decoded) lines = decoded.split('\n').map(l => l.trim()).filter(Boolean);
   }
 
   parsedServers = [];
@@ -1012,350 +440,76 @@ parseBtn.addEventListener('click', () => {
     catch(e){ errors.push(line.slice(0,50) + '…  —  ' + e.message); }
   });
 
-  if(errors.length){
-    parseErrors.innerHTML = errors.map(e => '<div class="error-line">' + e.replace(/</g,'&lt;') + '</div>').join('');
-  }
+  if(errors.length) parseErrors.innerHTML = errors.map(e => '<div class="error">' + escapeHtml(e) + '</div>').join('');
   parseSummary.textContent = parsedServers.length ? (parsedServers.length + ' server(s) parsed') : 'No valid links found.';
 
   if(parsedServers.length){
+    selectedId = parsedServers[0].id;
     renderServerList();
-    serversSection.style.display = '';
+    serverSection.style.display = '';
     optionsSection.style.display = '';
     outputSection.style.display = '';
-    setFlowStep(3);
-    updateMuxVisionNote();
   } else {
-    serversSection.style.display = 'none';
+    serverSection.style.display = 'none';
     optionsSection.style.display = 'none';
     outputSection.style.display = 'none';
-    setFlowStep(1);
   }
-});
-
-clearBtn.addEventListener('click', () => {
-  linkInput.value = '';
-  parsedServers = []; selectedId = null;
-  parseSummary.textContent = ''; parseErrors.innerHTML = '';
-  serversSection.style.display = 'none';
-  optionsSection.style.display = 'none';
-  outputSection.style.display = 'none';
-  output.style.display = 'none';
-  copyBtn.style.display = 'none';
-  downloadBtn.style.display = 'none';
-  document.getElementById('tunCommandsSection').style.display = 'none';
-  setFlowStep(1);
 });
 
 function renderServerList(){
   serverList.innerHTML = '';
-  if(!selectedId || !parsedServers.some(s => s.id === selectedId)){
-    const firstSupported = parsedServers.find(s => s.protocol !== 'tuic');
-    selectedId = (firstSupported || parsedServers[0]).id;
-  }
   parsedServers.forEach(s => {
-    const unsupported = s.protocol === 'tuic';
     const div = document.createElement('label');
-    div.className = 'server' + (s.id === selectedId ? ' selected' : '') + (unsupported ? ' unsupported' : '');
-    div.innerHTML = `
-      <input type="radio" name="serverSel" value="${s.id}" ${s.id === selectedId ? 'checked' : ''} ${unsupported ? 'disabled' : ''}>
-      <span class="badge proto-${s.protocol}">${s.protocol}</span>
-      <div class="meta">
-        <div class="name">${escapeHtml(s.remark || s.address)}</div>
-        <div class="sub">${escapeHtml(s.address)}:${s.port}${unsupported ? ' — <span class="warn-badge">not supported by xray-core, use sing-box</span>' : ''}</div>
-      </div>
-    `;
-    div.querySelector('input').addEventListener('change', () => { selectedId = s.id; renderServerList(); updateMuxVisionNote(); });
+    div.className = 'server' + (s.id === selectedId ? ' selected' : '');
+    div.innerHTML = `<input type="radio" name="serverSel" value="${s.id}" ${s.id === selectedId ? 'checked' : ''}>
+      <span class="badge">${s.protocol}</span>
+      <span class="name">${escapeHtml(s.remark || s.address)}</span>
+      <span class="sub">&nbsp;${escapeHtml(s.address)}:${s.port}</span>`;
+    div.querySelector('input').addEventListener('change', () => { selectedId = s.id; renderServerList(); });
     serverList.appendChild(div);
   });
 }
 
-function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-// Custom domain routing entries: current xray-core domain matchers only ever compare against a bare
-// hostname (sniffed SNI/Host), so a pasted full URL like "https://example.com/path" would never match
-// anything — silently making the rule a no-op. Strip scheme/path/query for anything not already using
-// one of xray's own prefixes, and accept comma OR newline as a separator (comma is what the DNS-servers
-// field above uses, so people reasonably paste comma lists here too).
-const KNOWN_DOMAIN_PREFIX = /^(domain:|full:|regexp:|keyword:|geosite:)/i;
-function sanitizeDomainEntry(raw){
-  let s = raw.trim();
-  if(!s) return null;
-  if(KNOWN_DOMAIN_PREFIX.test(s)) return s;
-  s = s.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, ''); // strip a URL scheme like https://
-  s = s.split(/[/?#]/)[0]; // strip any path/query/fragment
-  return s.trim();
-}
-function looksMalformed(s){
-  return !s || /\s/.test(s) || s.includes('://') || (KNOWN_DOMAIN_PREFIX.test(s) && s.split(':')[1] === '');
-}
-function parseDomainLines(id){
-  return document.getElementById(id).value
-    .split(/[\n,]+/)
-    .map(sanitizeDomainEntry)
-    .filter(Boolean);
-}
-function renderDomainPreview(fieldId, previewId){
-  const entries = document.getElementById(fieldId).value.split(/[\n,]+/).map(sanitizeDomainEntry).filter(Boolean);
-  const el = document.getElementById(previewId);
-  el.innerHTML = entries.map(e => `<span class="domain-pill${looksMalformed(e) ? ' warn' : ''}">${escapeHtml(e)}</span>`).join('');
-}
-['customProxyDomains','customDirectDomains'].forEach(id => {
-  document.getElementById(id).addEventListener('input', () => renderDomainPreview(id, id + 'Preview'));
-});
-
-// mode toggle
 document.getElementById('modeBtnSocks').addEventListener('click', () => setMode('socks'));
 document.getElementById('modeBtnTun').addEventListener('click', () => setMode('tun'));
 function setMode(mode){
+  currentMode = mode;
   document.getElementById('modeBtnSocks').classList.toggle('active', mode === 'socks');
   document.getElementById('modeBtnTun').classList.toggle('active', mode === 'tun');
-  document.getElementById('socksOptions').style.display = mode === 'socks' ? '' : 'none';
-  document.getElementById('tunOptions').style.display = mode === 'tun' ? '' : 'none';
-  currentMode = mode;
-}
-let currentMode = 'socks';
-
-// advanced option show/hide wiring
-document.getElementById('optInboundAuth').addEventListener('change', e => {
-  document.getElementById('inboundAuthFields').style.display = e.target.checked ? '' : 'none';
-});
-document.getElementById('optMux').addEventListener('change', e => {
-  document.getElementById('muxFields').style.display = e.target.checked ? '' : 'none';
-  updateMuxVisionNote();
-});
-document.getElementById('optFragment').addEventListener('change', e => {
-  document.getElementById('fragmentFields').style.display = e.target.checked ? '' : 'none';
-});
-function updateLanExposureNote(){
-  const lan = document.getElementById('listenAddress').value === '0.0.0.0';
-  const authed = document.getElementById('optInboundAuth').checked;
-  document.getElementById('lanExposureNote').style.display = (lan && !authed) ? '' : 'none';
-}
-document.getElementById('listenAddress').addEventListener('change', updateLanExposureNote);
-document.getElementById('optInboundAuth').addEventListener('change', updateLanExposureNote);
-function updateMuxVisionNote(){
-  const server = parsedServers.find(s => s.id === selectedId);
-  const isVision = server && server.flow === 'xtls-rprx-vision';
-  const muxOn = document.getElementById('optMux').checked;
-  document.getElementById('muxVisionNote').style.display = (isVision && muxOn) ? '' : 'none';
-}
-
-// ---------- pre-export structural validation ----------
-// Catches configs that would parse as valid JSON but fail at runtime (or silently misbehave)
-// in xray-core itself — so problems surface here instead of only when the binary refuses to start.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const CIDR_RE = /^[0-9a-fA-F:.]+\/\d{1,3}$/;
-const INT_RANGE_RE = /^\d+(-\d+)?$/;
-const KNOWN_SS_METHODS = ['aes-128-gcm','aes-256-gcm','chacha20-poly1305','chacha20-ietf-poly1305','xchacha20-poly1305','2022-blake3-aes-128-gcm','2022-blake3-aes-256-gcm','2022-blake3-chacha20-poly1305','none','plain'];
-const validPort = p => Number.isInteger(p) && p >= 1 && p <= 65535;
-
-function validateServer(server, opts){
-  const errors = [];   // would very likely stop xray-core from starting or connecting at all — block export
-  const warnings = []; // suspicious but not necessarily fatal — export anyway, just flag it
-
-  if(!server.address) errors.push('Server address is empty.');
-  if(!validPort(server.port)) errors.push('Server port "' + server.port + '" is out of the valid 1–65535 range.');
-
-  if(server.protocol === 'vless' || server.protocol === 'vmess'){
-    if(!server.uuid) errors.push((server.protocol === 'vless' ? 'VLESS' : 'VMess') + ' UUID is empty.');
-    else if(!UUID_RE.test(server.uuid)) warnings.push('UUID "' + server.uuid + '" doesn\'t look like a standard UUID — double check it was copied correctly.');
-  }
-  if(server.protocol === 'trojan' && !server.password) errors.push('Trojan password is empty.');
-  if(server.protocol === 'shadowsocks'){
-    if(!server.password) errors.push('Shadowsocks password is empty.');
-    if(!server.method) errors.push('Shadowsocks method is empty.');
-    else if(!KNOWN_SS_METHODS.includes(server.method)) warnings.push('Shadowsocks method "' + server.method + '" isn\'t one of the commonly recognized ciphers — verify your xray-core build actually supports it.');
-  }
-  if(server.protocol === 'hysteria' && !server.auth) errors.push('Hysteria2 auth string is empty.');
-
-  const t = server.transport;
-  if(t){
-    if(t.security === 'reality'){
-      if(!t.pbk) errors.push('REALITY is selected but the public key (pbk) is empty — the handshake cannot succeed without it.');
-      if(!t.fp) warnings.push('REALITY has no client fingerprint set — most deployments expect one (e.g. chrome).');
-      if(t.sid && !/^[0-9a-f]*$/i.test(t.sid)) warnings.push('REALITY shortId "' + t.sid + '" contains non-hex characters, which isn\'t valid for this field.');
-    }
-    if(t.security === 'tls' && !t.sni) warnings.push('TLS is selected but there\'s no SNI/serverName set — many servers rely on this to route the handshake correctly.');
-    if(t.network === 'grpc' && !t.serviceName) warnings.push('gRPC transport has no serviceName set — this almost always needs to match the server\'s configuration exactly.');
-  }
-
-  if(opts.mode === 'socks'){
-    if(!validPort(opts.socksPort)) errors.push('SOCKS port "' + opts.socksPort + '" is out of the valid 1–65535 range.');
-    if(!validPort(opts.httpPort)) errors.push('HTTP port "' + opts.httpPort + '" is out of the valid 1–65535 range.');
-    if(opts.socksPort === opts.httpPort) errors.push('SOCKS port and HTTP port are both ' + opts.socksPort + ' — two inbounds can\'t bind the same port, xray-core will fail to start.');
-  } else {
-    if(opts.tunGw4 && !CIDR_RE.test(opts.tunGw4)) warnings.push('Planned interface IP "' + opts.tunGw4 + '" doesn\'t look like a valid CIDR (e.g. 10.10.0.1/24) — the generated routing commands may be wrong.');
-  }
-
-  if(opts.fragment && opts.fragment.enabled){
-    const packets = opts.fragment.packets;
-    if(packets && packets !== 'tlshello' && !INT_RANGE_RE.test(packets)) warnings.push('Fragment packets "' + packets + '" should be "tlshello" or a number/range like "1-3".');
-    ['length','interval'].forEach(f => {
-      const v = opts.fragment[f];
-      if(v && !INT_RANGE_RE.test(v)) warnings.push('Fragment ' + f + ' "' + v + '" doesn\'t look like a valid number or range (e.g. "100-200").');
-    });
-  }
-
-  return { errors, warnings };
-}
-
-// ---------- companion OS routing commands (TUN mode) ----------
-// xray-core's TUN inbound doesn't configure routing itself (confirmed directly against
-// XTLS/Xray-core's own proxy/tun/README.md) — these commands are the OS-level equivalent of
-// what that README documents per platform, filled in with this server's own details.
-function buildTunRoutingCommands(server, opts){
-  const name = opts.tunName || 'xray0';
-  const ip = (opts.tunGw4 || '10.10.0.1/24').split('/')[0];
-  const upstream = server.address; // may be a domain — flagged below if so
-  const isDomain = !/^\d{1,3}(\.\d{1,3}){3}$/.test(upstream) && upstream.indexOf(':') === -1;
-  const upstreamNote = isDomain
-    ? '# NOTE: "' + upstream + '" is a domain, not an IP — resolve it once yourself (e.g. `dig +short ' + upstream + '`)\n# and substitute the real IP below. OS routing commands route by IP, not hostname.\n'
-    : '';
-
-  if(opts.tunOS === 'windows'){
-    return upstreamNote +
-`# Windows (from an elevated / Administrator terminal), AFTER starting xray-core:
-# 1) find the interface id for "${name}" (it changes on every xray restart):
-route print
-# look for a line like:  47...........................${name}
-# 2) add a precise route to your proxy server via your real (physical) gateway, so xray's
-#    own connection to it doesn't loop back through the tunnel — replace <gw> with your
-#    router's LAN IP (ipconfig) and <id> with the interface number from step 1:
-route add ${upstream} mask 255.255.255.255 <gw> if <physical-interface-id>
-# 3) route general traffic on-link through the tunnel:
-route add 0.0.0.0 mask 0.0.0.0 0.0.0.0 if <id>
-# For IPv6, the adapter needs a routable (non-link-local) address first — see the note above.`;
-  }
-  if(opts.tunOS === 'macos'){
-    return upstreamNote +
-`# macOS, AFTER starting xray-core (interface name must match the scheme utunN, e.g. utun10):
-sudo route add -net ${upstream}/32 -iface <physical-interface-name-or-gateway>
-sudo route add -net 0.0.0.0/0 -iface ${name}
-# IPv6 example:
-# sudo route add -inet6 -host 2606:4700:4700::1111 -iface ${name}`;
-  }
-  if(opts.tunOS === 'freebsd'){
-    return upstreamNote +
-`# FreeBSD, AFTER starting xray-core (interface name must match the scheme tunN, e.g. tun0):
-ifconfig ${name} inet ${ip || '169.254.10.1/30'}
-route add -net ${upstream}/32 -iface <physical-interface-or-gateway>
-route add -net 0.0.0.0/0 -iface ${name}`;
-  }
-  // linux (default)
-  return upstreamNote +
-`# Linux, AFTER starting xray-core. Simplest form (adjust <gw> to your real gateway, e.g. via \`ip route\`):
-ip route add ${upstream}/32 via <gw>
-ip route add 0.0.0.0/0 dev ${name}
-# Safer alternative: keep this out of the main route table entirely (see the systemd-networkd
-# example in xray-core's own proxy/tun/README.md) so a misconfiguration can't take down all
-# networking — route only specific traffic into a separate table pointed at ${name}.`;
+  document.getElementById('socksFields').style.display = mode === 'socks' ? '' : 'none';
+  document.getElementById('tunFields').style.display = mode === 'tun' ? '' : 'none';
+  document.getElementById('tunNote').style.display = mode === 'tun' ? '' : 'none';
 }
 
 genBtn.addEventListener('click', () => {
   const server = parsedServers.find(s => s.id === selectedId);
   outputWarning.innerHTML = '';
-  if(!server){ outputWarning.innerHTML = '<div class="error-line">Parse and select a server first.</div>'; return; }
-  if(server.protocol === 'tuic'){
-    outputWarning.innerHTML = '<div class="error-line">xray-core has no TUIC outbound implementation. Pick a different server, or use sing-box for this one.</div>';
-    return;
-  }
+  if(!server){ outputWarning.innerHTML = '<div class="error">Parse and select a server first.</div>'; return; }
 
-  const dnsList = document.getElementById('dnsServers').value.split(',').map(s => s.trim()).filter(Boolean);
   const opts = {
     mode: currentMode,
     socksPort: parseInt(document.getElementById('socksPort').value, 10) || 10809,
     httpPort: parseInt(document.getElementById('httpPort').value, 10) || 10808,
     tunName: document.getElementById('tunName').value.trim(),
     tunMtu: parseInt(document.getElementById('tunMtu').value, 10) || 1500,
-    tunGw4: document.getElementById('tunGw4').value.trim(),
-    tunOS: document.getElementById('tunOS').value,
-    tunSendThrough: document.getElementById('tunSendThrough').value.trim(),
-    bypassPrivate: document.getElementById('optBypassPrivate').checked,
-    blockAds: document.getElementById('optBlockAds').checked,
-    dnsList,
-    logLevel: document.getElementById('logLevel').value,
-    sniffingEnabled: document.getElementById('optSniffing').checked,
-    routeOnly: document.getElementById('optRouteOnly').checked,
-    fakeDns: document.getElementById('optFakeDns').checked,
-    inboundAuth: {
-      enabled: document.getElementById('optInboundAuth').checked,
-      user: document.getElementById('authUser').value.trim() || 'user',
-      pass: document.getElementById('authPass').value
-    },
-    mux: {
-      enabled: document.getElementById('optMux').checked,
-      concurrency: parseInt(document.getElementById('muxConcurrency').value, 10) || 8,
-      xudpProxyUDP443: document.getElementById('muxXudp443').value
-    },
-    fragment: {
-      enabled: document.getElementById('optFragment').checked,
-      packets: document.getElementById('fragPackets').value.trim(),
-      length: document.getElementById('fragLength').value.trim(),
-      interval: document.getElementById('fragInterval').value.trim()
-    },
-    dnsQueryStrategy: document.getElementById('dnsQueryStrategy').value,
-    dnsDisableCache: document.getElementById('dnsDisableCache').value === 'true',
-    routingDomainStrategy: document.getElementById('routingDomainStrategy').value,
-    freedomDomainStrategy: document.getElementById('freedomDomainStrategy').value,
-    customProxyDomains: parseDomainLines('customProxyDomains'),
-    customDirectDomains: parseDomainLines('customDirectDomains'),
-    listenAddress: document.getElementById('listenAddress').value,
-    socksUdp: document.getElementById('socksUdp').value === 'true',
-    fpOverride: document.getElementById('fpOverride').value || '',
-    certPin: document.getElementById('certPin').value.trim(),
-    echConfig: document.getElementById('echConfig').value.trim(),
-    blockDns53: document.getElementById('optBlockDns53').checked
+    bypassPrivate: document.getElementById('bypassPrivate').checked,
+    blockAds: document.getElementById('blockAds').checked,
+    dnsList: document.getElementById('dnsServers').value.split(',').map(s => s.trim()).filter(Boolean),
+    logLevel: document.getElementById('logLevel').value
   };
 
-  const validation = validateServer(server, opts);
-  if(validation.errors.length){
-    outputWarning.innerHTML =
-      '<div class="note" style="border-color:rgba(229,72,77,.4);"><b style="color:var(--red);">Fix these before exporting</b> — this config would very likely fail to start or connect in xray-core:<ul style="margin:8px 0 0;padding-left:18px;">' +
-      validation.errors.map(e => '<li>' + escapeHtml(e) + '</li>').join('') +
-      '</ul></div>';
-    output.style.display = 'none';
-    copyBtn.style.display = 'none';
-    downloadBtn.style.display = 'none';
+  if(opts.mode === 'socks' && opts.socksPort === opts.httpPort){
+    outputWarning.innerHTML = '<div class="error">SOCKS port and HTTP port can\'t both be ' + opts.socksPort + ' — two inbounds can\'t bind the same port.</div>';
     return;
   }
 
   let cfg;
   try{ cfg = buildConfig(server, opts); }
-  catch(e){ outputWarning.innerHTML = '<div class="error-line">' + e.message + '</div>'; return; }
+  catch(e){ outputWarning.innerHTML = '<div class="error">' + escapeHtml(e.message) + '</div>'; return; }
 
-  const notes = [];
-  validation.warnings.forEach(w => notes.push('<b>Note:</b> ' + escapeHtml(w)));
   if(server.protocol === 'hysteria'){
-    notes.push('<b>Note:</b> Hysteria2 outbound support in xray-core is newer and has had version-to-version bugs. Test connectivity before relying on it, and check your installed xray-core changelog if it misbehaves.');
+    outputWarning.innerHTML = '<div class="note">Hysteria2 outbound support in xray-core is newer and has had version-to-version bugs — test connectivity before relying on it.</div>';
   }
-  if(server.transport && (server.transport.network === 'http' || server.transport.network === 'h2')){
-    notes.push('<b>Note:</b> this link specified the old HTTP/2 ("http"/"h2") transport, which xray-core has removed entirely. The generated config uses XHTTP instead (its direct replacement, covering H2 &amp; H3) — confirm the server side also runs XHTTP.');
-  }
-  if(server.protocol === 'vless' && server.encryption && server.encryption !== 'none'){
-    notes.push('<b>Note:</b> this link carries a non-"none" VLESS Encryption string (post-quantum ML-KEM-768/X25519). It\'s passed through as-is, but double check it was generated for this exact server — mismatched encryption strings fail the handshake.');
-  }
-  if(server.transport && server.transport.security === 'tls' && server.transport.allowInsecure){
-    notes.push('<b>Note:</b> "allowInsecure" is deprecated in current xray-core (moving toward <code>pinnedPeerCertSha256</code>) but is still honored — some newer builds may reject it. If your client fails to start, remove it and pin the certificate instead.');
-  }
-  if(opts.listenAddress === '0.0.0.0' && !(opts.inboundAuth && opts.inboundAuth.enabled)){
-    notes.push('<b>Note:</b> the SOCKS/HTTP inbounds are set to listen on 0.0.0.0 (all interfaces) with no username/password required. Anyone on your LAN — or any network this device joins — can use this proxy freely. Turn on inbound authentication if that\'s not intended.');
-  }
-  const plaintextDns = opts.dnsList.filter(s => !/^https:\/\/|^tls:\/\//.test(s) && s !== 'localhost' && s !== 'fakedns');
-  if(plaintextDns.length){
-    notes.push('<b>Note:</b> these DNS servers are plaintext, unencrypted UDP (' + plaintextDns.map(escapeHtml).join(', ') + ') — queries to them can be observed or tampered with by anything between this device and the resolver. Prefer DNS-over-HTTPS (<code>https://1.1.1.1/dns-query</code>) or DNS-over-TLS (<code>tls://1.1.1.1</code>) instead.');
-  }
-  if((opts.certPin || opts.echConfig) && server.transport && server.transport.security !== 'tls' && server.protocol !== 'hysteria'){
-    notes.push('<b>Note:</b> certificate pinning and ECH only apply to plain TLS security — this server uses "' + (server.transport ? server.transport.security : 'none') + '", so those fields were not added to the generated config.');
-  }
-  const hasCustomDomainRules = (opts.customProxyDomains.length || opts.customDirectDomains.length);
-  if(hasCustomDomainRules && !opts.sniffingEnabled){
-    notes.push('<b>Note:</b> sniffing is turned off, but you\'ve set custom domain routing rules. Without sniffing, xray-core only ever sees the raw destination IP for most inbound connections — it can\'t match domain-based rules at all in that case. Turn sniffing back on (under "Traffic sniffing" above) for these rules to take effect.');
-  }
-  const badDomains = [...opts.customProxyDomains, ...opts.customDirectDomains].filter(looksMalformed);
-  if(badDomains.length){
-    notes.push('<b>Note:</b> these custom domain entries still look malformed after cleanup and likely won\'t match anything: ' + badDomains.map(escapeHtml).join(', ') + '. Domain rules match against a bare hostname only (from sniffed SNI/Host) — no scheme, no path, no spaces.');
-  }
-  if(notes.length) outputWarning.innerHTML = notes.map(n => '<div class="note">' + n + '</div>').join('');
 
   const json = JSON.stringify(cfg, null, 2);
   output.innerHTML = highlight(json);
@@ -1363,15 +517,6 @@ genBtn.addEventListener('click', () => {
   output.style.display = '';
   copyBtn.style.display = '';
   downloadBtn.style.display = '';
-  setFlowStep(4);
-
-  const tunCommandsSection = document.getElementById('tunCommandsSection');
-  if(opts.mode === 'tun'){
-    document.getElementById('tunCommands').textContent = buildTunRoutingCommands(server, opts);
-    tunCommandsSection.style.display = '';
-  } else {
-    tunCommandsSection.style.display = 'none';
-  }
 });
 
 copyBtn.addEventListener('click', () => {
@@ -1380,15 +525,6 @@ copyBtn.addEventListener('click', () => {
     setTimeout(() => copyBtn.textContent = 'Copy', 1200);
   });
 });
-
-document.getElementById('copyTunCmdBtn').addEventListener('click', () => {
-  const btn = document.getElementById('copyTunCmdBtn');
-  navigator.clipboard.writeText(document.getElementById('tunCommands').textContent || '').then(() => {
-    btn.textContent = 'Copied!';
-    setTimeout(() => btn.textContent = 'Copy commands', 1200);
-  });
-});
-
 downloadBtn.addEventListener('click', () => {
   const blob = new Blob([output.dataset.raw || ''], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -1397,154 +533,6 @@ downloadBtn.addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
-// ---------- round-trip config.json import ----------
-function importConfig(cfg){
-  if(!cfg || !Array.isArray(cfg.outbounds)) throw new Error('Not a valid xray-core config: missing an "outbounds" array.');
-  const ob = cfg.outbounds.find(o => o.tag === 'proxy') ||
-             cfg.outbounds.find(o => !['freedom','blackhole','dns'].includes(o.protocol));
-  if(!ob) throw new Error('No proxy outbound found in this config (looked for tag "proxy", or the first non-infrastructure outbound).');
-  const server = serverFromOutbound(ob);
-  if(!server) throw new Error('Outbound protocol "' + ob.protocol + '" isn\'t one this tool can round-trip (supported: vless, vmess, trojan, shadowsocks, hysteria).');
-
-  parsedServers.push(server);
-  selectedId = server.id;
-
-  const inbounds = cfg.inbounds || [];
-  const tunInbound = inbounds.find(i => i.protocol === 'tun');
-  const socksInbound = inbounds.find(i => i.protocol === 'socks');
-  const httpInbound = inbounds.find(i => i.protocol === 'http');
-  const mode = tunInbound ? 'tun' : 'socks';
-
-  if(socksInbound){
-    document.getElementById('socksPort').value = socksInbound.port || 10809;
-    document.getElementById('listenAddress').value = socksInbound.listen === '0.0.0.0' ? '0.0.0.0' : '127.0.0.1';
-    document.getElementById('socksUdp').value = (socksInbound.settings && socksInbound.settings.udp === false) ? 'false' : 'true';
-    const users = socksInbound.settings && socksInbound.settings.users;
-    document.getElementById('optInboundAuth').checked = !!(users && users.length);
-    document.getElementById('authUser').value = (users && users[0] && users[0].user) || 'user';
-    document.getElementById('authPass').value = (users && users[0] && users[0].pass) || '';
-  }
-  if(httpInbound) document.getElementById('httpPort').value = httpInbound.port || 10808;
-  if(tunInbound){
-    const ts = tunInbound.settings || {};
-    document.getElementById('tunName').value = ts.name || 'xray0';
-    document.getElementById('tunMtu').value = ts.MTU || ts.mtu || 1500;
-    // Older configs (including ones this tool generated before this fix) may still carry a
-    // "gateway" array — xray-core itself never actually used it, but if present it's still a
-    // reasonable guess for the "planned interface IP" informational field.
-    const gw = ts.gateway || [];
-    document.getElementById('tunGw4').value = gw.find(g => g.indexOf(':') === -1) || '';
-    document.getElementById('tunSendThrough').value = ob.sendThrough || '';
-  }
-  setMode(mode);
-
-  const activeInbound = tunInbound || socksInbound || {};
-  const sniffing = activeInbound.sniffing || {};
-  document.getElementById('optSniffing').checked = sniffing.enabled !== false;
-  document.getElementById('optRouteOnly').checked = !!sniffing.routeOnly;
-  const dnsServersRaw = (cfg.dns && cfg.dns.servers) || [];
-  const fakeDnsOn = (sniffing.destOverride && sniffing.destOverride.includes('fakedns')) || dnsServersRaw.includes('fakedns');
-  document.getElementById('optFakeDns').checked = !!fakeDnsOn;
-  document.getElementById('inboundAuthFields').style.display = document.getElementById('optInboundAuth').checked ? '' : 'none';
-
-  const dns = cfg.dns || {};
-  const dnsServersClean = dnsServersRaw.filter(s => typeof s === 'string' && s !== 'fakedns' && s !== 'localhost');
-  document.getElementById('dnsServers').value = dnsServersClean.join(', ');
-  document.getElementById('dnsQueryStrategy').value = dns.queryStrategy || '';
-  document.getElementById('dnsDisableCache').value = dns.disableCache ? 'true' : 'false';
-  document.getElementById('logLevel').value = (cfg.log && cfg.log.loglevel) || 'warning';
-
-  const routing = cfg.routing || {};
-  document.getElementById('routingDomainStrategy').value = routing.domainStrategy || 'IPIfNonMatch';
-  const rules = routing.rules || [];
-  document.getElementById('optBypassPrivate').checked = rules.some(r => r.outboundTag === 'direct' && Array.isArray(r.ip) && r.ip.includes('geoip:private'));
-  document.getElementById('optBlockDns53').checked = rules.some(r => r.outboundTag === 'block' && String(r.port) === '53');
-  document.getElementById('optBlockAds').checked = rules.some(r => r.outboundTag === 'block' && Array.isArray(r.domain) && r.domain.includes('geosite:category-ads-all'));
-  const proxyDomainRule = rules.find(r => r.outboundTag === 'proxy' && Array.isArray(r.domain));
-  const directDomainRule = rules.find(r => r.outboundTag === 'direct' && Array.isArray(r.domain));
-  document.getElementById('customProxyDomains').value = proxyDomainRule ? proxyDomainRule.domain.join('\n') : '';
-  document.getElementById('customDirectDomains').value = directDomainRule ? directDomainRule.domain.join('\n') : '';
-  renderDomainPreview('customProxyDomains', 'customProxyDomainsPreview');
-  renderDomainPreview('customDirectDomains', 'customDirectDomainsPreview');
-
-  const directOb = cfg.outbounds.find(o => o.protocol === 'freedom');
-  const directSettings = (directOb && directOb.settings) || {};
-  document.getElementById('freedomDomainStrategy').value = directSettings.domainStrategy || 'UseIP';
-  document.getElementById('optFragment').checked = !!directSettings.fragment;
-  if(directSettings.fragment){
-    document.getElementById('fragPackets').value = directSettings.fragment.packets || 'tlshello';
-    document.getElementById('fragLength').value = directSettings.fragment.length || '100-200';
-    document.getElementById('fragInterval').value = directSettings.fragment.interval || '10-20';
-  }
-  document.getElementById('fragmentFields').style.display = document.getElementById('optFragment').checked ? '' : 'none';
-
-  document.getElementById('optMux').checked = !!(ob.mux && ob.mux.enabled);
-  if(ob.mux && ob.mux.enabled){
-    document.getElementById('muxConcurrency').value = ob.mux.concurrency || 8;
-    document.getElementById('muxXudp443').value = ob.mux.xudpProxyUDP443 || 'reject';
-  }
-  document.getElementById('muxFields').style.display = document.getElementById('optMux').checked ? '' : 'none';
-
-  const tlsS = (ob.streamSettings && ob.streamSettings.tlsSettings) || {};
-  document.getElementById('certPin').value = tlsS.pinnedPeerCertSha256 || '';
-  document.getElementById('echConfig').value = tlsS.echConfigList || '';
-  document.getElementById('fpOverride').value = ''; // fingerprint is already baked into the imported server's own transport
-
-  renderServerList();
-  serversSection.style.display = '';
-  optionsSection.style.display = '';
-  outputSection.style.display = '';
-  setFlowStep(3);
-  updateMuxVisionNote();
-  updateLanExposureNote();
-
-  const extraOutbounds = cfg.outbounds.filter(o => o !== ob && !['freedom','blackhole','dns'].includes(o.protocol));
-  return { protocol: ob.protocol, extraOutbounds: extraOutbounds.length };
-}
-
-function runImportFromText(raw, sourceLabel){
-  const importErrors = document.getElementById('importErrors');
-  importErrors.innerHTML = '';
-  raw = (raw || '').trim();
-  if(!raw){ importErrors.innerHTML = '<div class="error-line">' + (sourceLabel === 'file' ? 'That file was empty.' : 'Paste a config.json first.') + '</div>'; return; }
-  let cfg;
-  try{ cfg = JSON.parse(raw); }
-  catch(e){ importErrors.innerHTML = '<div class="error-line">Not valid JSON: ' + escapeHtml(e.message) + '</div>'; return; }
-  try{
-    const result = importConfig(cfg);
-    parseSummary.textContent = 'Imported 1 server (' + result.protocol + ') from ' + (sourceLabel === 'file' ? 'the uploaded config.json.' : 'config.json.');
-    if(result.extraOutbounds > 0){
-      importErrors.innerHTML = '<div class="note">This config had ' + result.extraOutbounds + ' other proxy outbound(s) besides the active one — balancers and multi-server setups aren\'t supported here, so only the active proxy outbound was imported.</div>';
-    }
-  }catch(e){
-    importErrors.innerHTML = '<div class="error-line">' + escapeHtml(e.message) + '</div>';
-  }
-}
-
-document.getElementById('importBtn').addEventListener('click', () => {
-  runImportFromText(document.getElementById('configImportInput').value, 'paste');
-});
-
-document.getElementById('uploadConfigBtn').addEventListener('click', () => {
-  document.getElementById('configFileInput').click();
-});
-document.getElementById('configFileInput').addEventListener('change', (e) => {
-  const file = e.target.files && e.target.files[0];
-  const nameEl = document.getElementById('uploadedFileName');
-  if(!file){ nameEl.textContent = ''; return; }
-  nameEl.textContent = file.name;
-  const reader = new FileReader();
-  reader.onload = () => {
-    document.getElementById('configImportInput').value = reader.result;
-    runImportFromText(reader.result, 'file');
-  };
-  reader.onerror = () => {
-    document.getElementById('importErrors').innerHTML = '<div class="error-line">Could not read that file.</div>';
-  };
-  reader.readAsText(file);
-});
-
-setFlowStep(1);
 })();
 </script>
 </body>
