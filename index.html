@@ -117,6 +117,11 @@
     <div class="check"><label class="check"><input type="checkbox" id="bypassPrivate" checked> Route private/LAN IPs directly</label></div>
     <div class="check"><label class="check"><input type="checkbox" id="blockAds"> Block ad/tracker domains</label></div>
 
+    <div class="field" style="margin-top:12px;">
+      <label>Direct domains (bypass the proxy) — one per line or comma-separated</label>
+      <textarea id="directDomains" style="min-height:70px;" placeholder="example.com&#10;geosite:cn&#10;geosite:netflix"></textarea>
+    </div>
+
     <div class="grid" style="margin-top:12px;">
       <div class="field"><label>DNS servers</label><input type="text" id="dnsServers" value="https://1.1.1.1/dns-query, https://dns.google/dns-query"></div>
       <div class="field"><label>Log level</label>
@@ -159,6 +164,21 @@ function b64decode(str){
 }
 function looksBase64(s){ return /^[A-Za-z0-9+/_-]+={0,2}$/.test(s) && s.length > 20; }
 function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// A pasted "https://example.com/path" would never match a sniffed SNI/Host value (those are
+// bare hostnames only) — strip scheme/path so direct-domain entries actually work, unless the
+// entry already uses one of xray's own matcher prefixes.
+const KNOWN_DOMAIN_PREFIX = /^(domain:|full:|regexp:|keyword:|geosite:)/i;
+function sanitizeDomainEntry(raw){
+  let s = raw.trim();
+  if(!s) return null;
+  if(KNOWN_DOMAIN_PREFIX.test(s)) return s;
+  s = s.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, '').split(/[/?#]/)[0];
+  return s.trim() || null;
+}
+function parseDomainList(raw){
+  return raw.split(/[\n,]+/).map(sanitizeDomainEntry).filter(Boolean);
+}
 
 function splitLinkParts(link, schemeLen){
   let body = link.slice(schemeLen);
@@ -378,6 +398,7 @@ function buildConfig(server, opts){
 
   const rules = [];
   if(opts.bypassPrivate) rules.push({ type: 'field', ip: ['geoip:private'], outboundTag: 'direct' });
+  if(opts.directDomains && opts.directDomains.length) rules.push({ type: 'field', domain: opts.directDomains, outboundTag: 'direct' });
   if(opts.blockAds) rules.push({ type: 'field', domain: ['geosite:category-ads-all'], outboundTag: 'block' });
 
   return {
@@ -494,6 +515,7 @@ genBtn.addEventListener('click', () => {
     tunMtu: parseInt(document.getElementById('tunMtu').value, 10) || 1500,
     bypassPrivate: document.getElementById('bypassPrivate').checked,
     blockAds: document.getElementById('blockAds').checked,
+    directDomains: parseDomainList(document.getElementById('directDomains').value),
     dnsList: document.getElementById('dnsServers').value.split(',').map(s => s.trim()).filter(Boolean),
     logLevel: document.getElementById('logLevel').value
   };
