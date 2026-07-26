@@ -107,6 +107,19 @@
     <div id="socksFields" class="grid">
       <div class="field"><label>SOCKS port</label><input type="number" id="socksPort" value="10809"></div>
       <div class="field"><label>HTTP port</label><input type="number" id="httpPort" value="10808"></div>
+      <div class="field"><label>Listen address</label>
+        <select id="listenAddress">
+          <option value="127.0.0.1" selected>127.0.0.1 (this device only)</option>
+          <option value="0.0.0.0">0.0.0.0 (allow LAN devices to connect)</option>
+        </select>
+      </div>
+    </div>
+    <div id="socksAuthWrap" class="check" style="display:flex;">
+      <label class="check"><input type="checkbox" id="requireAuth"> Require a username/password</label>
+    </div>
+    <div id="authFields" class="grid" style="display:none;">
+      <div class="field"><label>Username</label><input type="text" id="authUser" value="user"></div>
+      <div class="field"><label>Password</label><input type="text" id="authPass" value=""></div>
     </div>
     <div id="tunFields" class="grid" style="display:none;">
       <div class="field"><label>Platform</label>
@@ -396,8 +409,15 @@ function buildConfig(server, opts){
   const sniffing = { enabled: true, destOverride: ['http','tls','quic'] };
   const inbounds = [];
   if(opts.mode === 'socks'){
-    inbounds.push({ tag: 'socks-in', listen: '127.0.0.1', port: opts.socksPort, protocol: 'socks', settings: { auth: 'noauth', udp: true, ip: '127.0.0.1' }, sniffing });
-    inbounds.push({ tag: 'http-in', listen: '127.0.0.1', port: opts.httpPort, protocol: 'http', settings: {}, sniffing });
+    const socksSettings = { auth: 'noauth', udp: true, ip: '127.0.0.1' };
+    const httpSettings = {};
+    if(opts.requireAuth){
+      socksSettings.auth = 'password';
+      socksSettings.users = [{ user: opts.authUser, pass: opts.authPass }];
+      httpSettings.users = [{ user: opts.authUser, pass: opts.authPass }];
+    }
+    inbounds.push({ tag: 'socks-in', listen: opts.listenAddress, port: opts.socksPort, protocol: 'socks', settings: socksSettings, sniffing });
+    inbounds.push({ tag: 'http-in', listen: opts.listenAddress, port: opts.httpPort, protocol: 'http', settings: httpSettings, sniffing });
   } else {
     // xray-core's own proxy/tun/README.md: name + MTU are the only real settings fields.
     // No gateway/dns/auto-route options exist — routing must be configured at the OS level.
@@ -499,6 +519,10 @@ function renderServerList(){
   });
 }
 
+document.getElementById('requireAuth').addEventListener('change', e => {
+  document.getElementById('authFields').style.display = e.target.checked ? '' : 'none';
+});
+
 document.getElementById('modeBtnSocks').addEventListener('click', () => setMode('socks'));
 document.getElementById('modeBtnTun').addEventListener('click', () => setMode('tun'));
 
@@ -527,6 +551,8 @@ function setMode(mode){
   document.getElementById('modeBtnSocks').classList.toggle('active', mode === 'socks');
   document.getElementById('modeBtnTun').classList.toggle('active', mode === 'tun');
   document.getElementById('socksFields').style.display = mode === 'socks' ? '' : 'none';
+  document.getElementById('socksAuthWrap').style.display = mode === 'socks' ? 'flex' : 'none';
+  document.getElementById('authFields').style.display = (mode === 'socks' && document.getElementById('requireAuth').checked) ? '' : 'none';
   document.getElementById('tunFields').style.display = mode === 'tun' ? '' : 'none';
   document.getElementById('tunNote').style.display = mode === 'tun' ? '' : 'none';
   if(mode === 'tun') updateTunPlatform();
@@ -541,6 +567,10 @@ genBtn.addEventListener('click', () => {
     mode: currentMode,
     socksPort: parseInt(document.getElementById('socksPort').value, 10) || 10809,
     httpPort: parseInt(document.getElementById('httpPort').value, 10) || 10808,
+    listenAddress: document.getElementById('listenAddress').value,
+    requireAuth: document.getElementById('requireAuth').checked,
+    authUser: document.getElementById('authUser').value.trim() || 'user',
+    authPass: document.getElementById('authPass').value,
     tunPlatform: document.getElementById('tunPlatform').value,
     tunName: document.getElementById('tunName').value.trim(),
     tunMtu: parseInt(document.getElementById('tunMtu').value, 10) || 1500,
@@ -553,6 +583,10 @@ genBtn.addEventListener('click', () => {
 
   if(opts.mode === 'socks' && opts.socksPort === opts.httpPort){
     outputWarning.innerHTML = '<div class="error">SOCKS port and HTTP port can\'t both be ' + opts.socksPort + ' — two inbounds can\'t bind the same port.</div>';
+    return;
+  }
+  if(opts.mode === 'socks' && opts.requireAuth && !opts.authPass){
+    outputWarning.innerHTML = '<div class="error">Auth is required but the password is empty.</div>';
     return;
   }
   if(opts.mode === 'tun'){
@@ -569,6 +603,9 @@ genBtn.addEventListener('click', () => {
 
   if(server.protocol === 'hysteria'){
     outputWarning.innerHTML = '<div class="note">Hysteria2 outbound support in xray-core is newer and has had version-to-version bugs — test connectivity before relying on it.</div>';
+  }
+  if(opts.mode === 'socks' && opts.listenAddress === '0.0.0.0' && !opts.requireAuth){
+    outputWarning.innerHTML += '<div class="note">Listening on 0.0.0.0 opens this proxy to your whole LAN with no password — anyone on the network can use it. Turn on "Require a username/password" above if that\'s not intended.</div>';
   }
 
   const json = JSON.stringify(cfg, null, 2);
