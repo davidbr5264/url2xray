@@ -1,147 +1,42 @@
 # xray-core Config Generator
 
-A single static `index.html` — no build step, no backend, no dependencies fetched at runtime beyond a Google Fonts stylesheet. Everything (parsing links, building JSON) runs client-side in the browser, so proxy links and keys never leave the user's machine.
+One file, `index.html`. No build step, no dependencies beyond a Google Fonts import. Paste a link, pick a server, get a config.json for a local SOCKS+HTTP proxy.
 
 ## Deploy to Cloudflare Pages
 
-**Option A — dashboard, no git:**
-1. Cloudflare dashboard → Workers & Pages → Create → Pages → **Upload assets**.
-2. Upload `index.html` (drag the file or the folder containing it).
-3. Deploy. Framework preset: "None" / static. No build command, no output directory needed beyond the root.
+Dashboard → Workers & Pages → Create → Pages → **Upload assets** → upload `index.html` → Deploy. Framework preset: None. No build command needed.
 
-**Option B — Wrangler CLI:**
-```bash
-npm install -g wrangler
-wrangler pages deploy . --project-name=xray-config-gen
-```
-(run from this folder — it will publish `index.html` as-is)
+Or via Wrangler: `wrangler pages deploy . --project-name=xray-config-gen` (run from this folder).
 
-**Option C — connect a GitHub repo:**
-Push this folder to a repo, then in Pages choose "Connect to Git", set build command to empty and output directory to `/`.
+## What it does
 
-## What it supports
+- Parses `vless://`, `vmess://`, `trojan://`, `ss://`, `hysteria2://`/`hy2://` links (single links, multiple lines, or a base64 subscription blob). `tuic://` links are rejected with a clear message — xray-core has no TUIC outbound.
+- Generates a current-schema xray-core config for a local SOCKS+HTTP proxy (TUN mode removed for now — see below).
+- Transports: raw/tcp, websocket, grpc, httpupgrade, xhttp, mkcp, quic. Security: none, tls, REALITY.
+- Options: listen on localhost or the LAN, optional username/password auth, bypass private/LAN IPs, block ad/tracker domains, direct-domain overrides, DNS servers (defaults to DNS-over-HTTPS, not plaintext), log level.
 
-- Parses `vless://`, `vmess://`, `trojan://`, `ss://`, `hysteria2://`/`hy2://`, `tuic://` links (single links or a base64 subscription blob).
-- Transports: tcp (raw/http-obfs), ws, grpc, http/h2, httpupgrade, xhttp, kcp, quic; security: none, tls, REALITY.
-- Two inbound modes:
-  - **SOCKS + HTTP** — standard local proxy, works with any xray-core version.
-  - **TUN** — uses xray-core's native `tun` inbound protocol (added in recent xray-core releases). Requires elevated/admin privileges to run, and a fairly current xray-core build.
-- `tuic://` links are parsed and shown, but config generation is blocked for them — **xray-core does not implement a TUIC outbound**. Use sing-box for those.
-- Hysteria2 (`hysteria` outbound in xray-core) is generated, but flagged with a caveat: xray-core's Hysteria2 support has had version-to-version bugs upstream, so verify against your installed release.
+## TUN mode: removed for now
 
-## Changelog — updated against current xray-core config schema
+TUN mode (and the platform-specific interface-naming logic from the last round) has been fully removed — SOCKS+HTTP is the only inbound this tool generates right now. We'll rebuild it deliberately later rather than leave it half-attached. Nothing else changed; parsing, direct domains, and LAN access all work exactly as before.
 
-Checked against the current official docs (xtls.github.io) and recent xray-core changelogs/issues, a few real schema changes went in:
+For whenever it comes back: the JSON schema was already confirmed correct (`{ name, MTU }` only — xray-core's own `proxy/tun/README.md` is explicit that no gateway/dns/auto-route fields exist), and interface naming genuinely differs by OS — free-form on Linux/Windows, `utunN` required on macOS, `tunN` required on FreeBSD. Worth re-verifying against the docs fresh rather than assuming this is still current by the time it's picked back up.
 
-- **Outbound settings are now flat, single-endpoint objects.** VLESS/VMess/Trojan/Shadowsocks outbounds no longer use the old `vnext`/`servers` arrays — current xray-core takes `address`/`port`/... directly under `settings`, one endpoint per outbound (multi-server setups are expected to use routing/balancers instead). Updated all four builders.
-- **REALITY's client-side field was renamed** `publicKey` → `password` (still the same x25519 public key value — just a name change to avoid implying it's safe to publish). Fixed.
-- **VMess dropped AlterId entirely.** No more `aid`/`alterId` in the outbound — removed.
-- **VLESS `encryption` is now read from the link** instead of hardcoded to `"none"` — newer links can carry a real VLESS Encryption string (post-quantum ML-KEM-768/X25519 key exchange), which is passed through as-is with an on-screen note to double-check it matches the server.
-- **`tcp`/`ws` transports renamed** to `raw`/`websocket` in current config (old names still work as aliases in the Go parser, but the generator now emits the current names).
-- **The old `http`/`h2` transport was removed from xray-core entirely** — links using it are now auto-migrated to XHTTP (its documented direct replacement) with an on-screen note.
-- **mKCP dropped its `header`/`seed` obfuscation fields** (moved to a separate FinalMask layer) — removed from the generator since there's no established link convention for FinalMask yet.
-- **TLS `allowInsecure` is deprecated** in favor of `pinnedPeerCertSha256`, though still documented as functional — only emitted when a link explicitly requests it, with a warning that newer builds may reject it.
-- **Hysteria2 outbound's `settings` object is much leaner** than previously modeled — just `version`/`address`/`port`; auth and TLS behavior live entirely in `streamSettings`.
+## LAN access
 
-## TUN on Windows: real, documented reliability caveats (not generic caution)
+A "Listen address" option switches the SOCKS/HTTP inbounds from `127.0.0.1` (this device only) to `0.0.0.0`, so other devices on your LAN can use the proxy. Pairs with an optional username/password gate (uses the correct `users` field — not `accounts`, a real xray-core pitfall where the wrong field name is silently ignored at runtime rather than erroring). Generation blocks if auth is required with an empty password, and warns if you open it to the LAN without auth.
 
-Re-checked TUN specifically against open xray-core GitHub issues, since it's had genuinely rougher edges on Windows than Linux/macOS:
+## Direct domains
 
-- **`wintun.dll` isn't bundled** with xray-core — it has to be placed next to `xray.exe` manually, or the TUN device silently fails to create.
-- **A currently-open bandwidth bug** (XTLS/Xray-core#5599): TUN connections on Windows stall/disconnect above roughly 10–15 Mbps, traced to a gVisor/Windows interaction; SOCKS mode isn't affected.
-- **`autoOutboundsInterface` doesn't always reliably prevent routing loops on Windows** (XTLS/Xray-core#6019) — one user reported TUN not working at all until manually setting `sendThrough`.
-- **IPv6 needs the adapter to already have a routable address**, not just the auto-assigned link-local one.
-- **No killswitch-friendly interface type** — Windows doesn't classify xray's TUN adapter as "Remote Access," so the common built-in-Firewall kill-switch rule doesn't apply to it.
-- A maintainer/contributor said directly in a GitHub discussion that **"xray tun mode is not stable"**, recommending SOCKS + tun2socks instead; the wider community also leans toward sing-box/mihomo for TUN specifically because those implementations are more feature-complete (strict-route, auto-redirect, UID/package filtering — none of which xray's own TUN has).
+A "Direct domains" field lets you list domains (or `geosite:`/`domain:`/`full:`/`keyword:`/`regexp:` matchers) that should always bypass the proxy and go straight out — one per line or comma-separated. Full URLs like `https://example.com/path` are auto-cleaned to just the hostname, since routing matches against sniffed SNI/Host values, which never include a scheme or path.
 
-Two concrete changes from this:
-- Added a **`sendThrough` field** (TUN options) — a manual fallback for the routing-loop problem, binding the proxy and direct outbounds' egress to a specific physical-adapter IP, for exactly the failure mode reported in #6019.
-- Replaced the generic "needs elevated privileges" note with the specific list above, directly in the TUN options panel — not just here in the README, since that's where someone actually hits the wall.
+## What it deliberately doesn't do
 
-If TUN keeps giving you grief on Windows specifically, SOCKS mode (this tool's other output) paired with tun2socks, or routing sing-box/mihomo's TUN in front of xray, are both better-tested paths than xray's native TUN on that platform.
+This is a rebuild after the previous version accumulated a lot of feature surface (mux, fragment, cert pinning, ECH, custom domain routing, fingerprint overrides, round-trip import, pre-export validation, per-OS TUN routing commands, a committed test suite). All of that got cut in favor of doing the core job well. If you need any of it, the generated JSON is a normal xray-core config — hand-edit it, or ask for a specific feature to be added back deliberately rather than by default.
 
-## Fixed: WebSocket "host" was nested in the wrong place
+## Schema notes (verified against xray-core's own docs)
 
-Found while re-verifying transport schemas: the current official `wsSettings` schema has `host` as its own **top-level field**, separate from `headers` (which is now for arbitrary custom headers, not specifically `Host`). This generator had been putting it at `wsSettings.headers.Host` instead — the older, no-longer-canonical form. Fixed in both the generator and the round-trip importer (which now accepts either form on import, so it can still read configs produced before this fix). Added as regression test #1 in `test-suite.js`.
-
-## Default ports changed, and config.json import now supports file upload
-
-- Default SOCKS port is now **10809**, default HTTP port is now **10808** (previously 1080/1081).
-- The "Import an existing config.json" section now has an **Upload file…** button alongside the paste box — pick a `.json` file from disk and it's read, imported, and populates the form automatically, same end result as pasting it in. Both paths share the same import logic under the hood, so there's no behavioral difference between the two.
-- Both changes are covered by two new tests in `test-suite.js` (now 27 total, up from 25), including a full round-trip check that uploading a file reproduces byte-for-byte the same config as pasting the same JSON would.
-
-## Reliability: committed regression test suite
-
-`test-suite.js` (+ `package.json`) is a permanent test suite, not a one-off — every ad-hoc check I ran by hand throughout this project (all protocols, all transports, every advanced option, both round-trip import scenarios, all four confirmed-bug regressions, and the import error paths) is now a standing, re-runnable test.
-
-Crucially, it doesn't re-implement or copy the generator's logic into a parallel test file that could drift out of sync — it loads the **real** `index.html` into a headless browser (jsdom) and drives it exactly like a person would: types into fields, clicks buttons, reads the generated JSON back out of the page. So it's testing the actual shipped code path, not a stand-in for it.
-
-```bash
-npm install
-node test-suite.js
-```
-
-25 tests, exits non-zero on any failure (CI-friendly). Sanity-checked the suite itself by deliberately reintroducing the `accounts`→`users` bug into a scratch copy and confirming it fails (2/25) rather than passing regardless of what's in the file — so this isn't a tautological check, it actually catches regressions.
-
-Re-run this after any future edit to `index.html` before redeploying.
-
-## Fixed: SOCKS/HTTP inbound auth used the wrong field name
-
-Re-checked every protocol/feature against the current docs again, and found one real, confirmed bug: the inbound-auth feature (added a few turns back) wrote credentials into an `"accounts"` array. **The actual xray-core field is `"users"`.** `"accounts"` isn't rejected — it just parses fine and is silently ignored at runtime, so the inbound stays wide open with no auth at all. This is a known community pitfall (see XTLS/Xray-core#4487 and #5943, where people hit exactly this and reported auth "just doesn't work"). Fixed for both the SOCKS and HTTP inbounds.
-
-Everything else in this pass re-verified clean: outbound flat-schema for VLESS/VMess/Trojan/Shadowsocks, the Hysteria2 outbound's lean `settings` object, TUN's exact field set (independently re-confirmed against three live examples, including one showing a broken config from using uppercase `"MTU"` instead of `mtu`), the `network: "tcp,udp"` string format for the DNS-leak routing rule, and TUIC's continued absence from both the inbound and outbound protocol lists — so blocking it was and still is correct.
-
-## Security hardening: DNS leak protection + cert pinning/ECH
-
-- **DNS servers now default to DoH** (`https://1.1.1.1/dns-query, https://dns.google/dns-query`) instead of plaintext UDP. If you switch to a plaintext entry, the generated output flags it as an observable/tamperable leak.
-- **"Block direct port-53 DNS" toggle** (on by default) adds a routing rule blocking raw UDP/TCP port 53 outside `geoip:private`, so an app or the OS can't quietly bypass xray's configured resolver and leak plaintext DNS queries around the tunnel.
-- **Certificate pinning** (`pinnedPeerCertSha256`) — pin a server's exact leaf-cert hash instead of (or alongside) trusting the CA chain. Get the hash with `xray tls hash --cert <cert.pem>`, `xray tls ping <host:port>`, or `openssl x509 -noout -fingerprint -sha256 -in cert.pem`. Note: this field changed from a JSON array to a single tilde-separated string in a recent xray-core release — the generator emits it that way.
-- **ECH (Encrypted Client Hello)** (`echConfigList`) — hides the SNI from network-level observers, which REALITY's camouflage doesn't fully do. Accepts either a fixed ECHConfig string or a DNS-query directive like `https://1.1.1.1/dns-query`.
-- Both cert pinning and ECH only apply where `tlsSettings` actually exists (plain TLS security, and Hysteria2's TLS layer) — not REALITY, which has its own mechanism. The tool warns rather than silently dropping the fields if you set them on an incompatible server.
-
-## New: Round-trip config.json import
-
-Step 1 now has a collapsible "Import an existing config.json instead" section. Paste back a config this tool generated (or any hand-written xray-core config using vless/vmess/trojan/shadowsocks/hysteria), and it reconstructs:
-
-- The active server (picks the outbound tagged `proxy`, or the first non-infrastructure outbound) — protocol, address, port, credentials, transport, security, and TLS/REALITY fields.
-- Inbound mode (SOCKS vs TUN) and all its settings, including listen address, UDP toggle, and auth.
-- Every advanced option: sniffing, mux, fragment, cert pinning, ECH, DNS servers/strategy/cache, routing strategy, custom domain rules, ad-block, DNS leak-block.
-
-Limitations:
-- Only round-trips a single active proxy outbound — configs with balancers or multiple proxy outbounds get a note that extras were skipped.
-- `wireguard`/`socks`/`http`-as-outbound (proxy chaining) aren't round-trippable, since they're not link protocols this tool speaks in the first place.
-- A global fingerprint override isn't reconstructed as an override — the fingerprint is already baked into the imported server's own transport settings, which has the same net effect.
-
-Verified with an actual round-trip test: generate a fully-loaded config (SOCKS+auth+fragment+custom domains+DNS strategy, and separately TUN+mux+cert-pinning+ECH+FakeDNS), import it into a fresh session, regenerate, and diff — both came back byte-for-byte identical on every structural field checked. Also checked the error paths (invalid JSON, missing outbounds, unsupported protocol, empty input) all fail with a clear message instead of breaking.
-
-## Inbound access & TLS/REALITY fingerprint controls
-
-- **Listen address** — SOCKS/HTTP inbounds default to `127.0.0.1`; can be switched to `0.0.0.0` to serve your whole LAN. The tool warns (live in the UI, and again in the generated config's notes) if you pick LAN-wide without also turning on inbound auth.
-- **UDP on/off** for the SOCKS inbound, as an explicit switch instead of always-on.
-- **Client fingerprint override** — forces a specific uTLS fingerprint (`chrome`/`firefox`/`safari`/`ios`/`android`/`edge`/`random`/`randomized`) on both `tlsSettings.fingerprint` and `realitySettings.fingerprint`, regardless of what an individual link specifies. Left blank, it falls through to each link's own value as before.
-
-## Customization options (Advanced panel)
-
-All grounded in current xray-core docs/schema:
-
-- **Sniffing** — enable/disable, `routeOnly` (route by sniffed SNI but still proxy to the original IP), and FakeDNS (`destOverride: ["fakedns"]` + a `"fakedns"` DNS server entry — handy for domain-based routing under TUN without a real lookup first).
-- **Inbound auth** — switches the local SOCKS/HTTP inbounds from open (`noauth`) to a username/password (`accounts` array), for when the local proxy isn't strictly localhost-only.
-- **Mux** — `enabled`/`concurrency`/`xudpProxyUDP443` on the proxy outbound. The tool warns when the selected server uses XTLS Vision flow, since Mux is generally not recommended alongside Vision (it breaks Vision's direct TCP splicing).
-- **Fragment** — TLS ClientHello fragmentation (`packets`/`length`/`interval`) on the direct/freedom outbound, for censorship circumvention on the dial-out to your own server.
-- **DNS query strategy & cache**, **routing `domainStrategy`**, and **Freedom outbound `domainStrategy`** — exposed as selects with the real enum values from the docs (`AsIs`/`UseIP`/`UseIPv4`/`UseIPv6`/`ForceIP`/etc., which differ slightly between routing and freedom).
-- **Custom domain routing** — free-text lists (accepting `domain:`/`geosite:`/plain domains, one per line) to always force via proxy or always send direct, layered in ahead of the ad-block rule.
-
-## Fixed: "Always direct domains" silently not matching
-
-Root-caused via the official docs' explicit note that domain-based routing depends entirely on sniffing recovering a domain from raw traffic — if xray only ever sees an IP, domain rules can never match, no matter how they're written. Two concrete UI bugs made that easy to trigger by accident:
-
-- **Full URLs weren't cleaned up.** Pasting `https://example.com/browse` (very natural, since that's what's in the address bar) put the literal string `https://example.com/browse` into the rule — which never appears in a sniffed SNI/Host value (those are bare hostnames only), so the rule silently never fired. Now stripped to `example.com` automatically, and left untouched if it already uses one of xray's own prefixes (`domain:`/`full:`/`keyword:`/`regexp:`/`geosite:`).
-- **Inconsistent separator.** The DNS-servers field above it uses commas; the domain lists only accepted newlines, so a comma-pasted list became one unmatched blob. Both fields now accept comma **or** newline.
-
-Also added: a live preview under each custom-domain field showing exactly what was parsed (so this stays visible instead of silently failing again), and an explicit warning in the generated output if sniffing is off while custom domain rules are set, since in that combination the rules are guaranteed to do nothing.
-
-## Notes / known limits
-
-- Only a single active outbound is generated at a time — no multi-server load balancing/failover config.
-- Shadowsocks plugins (obfs, v2ray-plugin, etc.) aren't parsed — plain SS only.
-- Always sanity-check the generated config against the xray-core version you're actually deploying; inbound/outbound schemas (especially `tun` and `hysteria`) have changed across releases.
+- Outbounds use the current flat schema (no `vnext`/`servers` arrays).
+- REALITY's client field is `password` (renamed from `publicKey`).
+- `tcp`/`ws` are now `raw`/`websocket`; the old `http`/`h2` transport was removed in favor of `xhttp`.
+- SOCKS/HTTP inbound auth uses `users`, not `accounts` — the wrong field name is silently ignored by xray-core at runtime rather than erroring.
+- **TUN inbound settings are `name` + `MTU` only** — xray-core's own `proxy/tun/README.md` is explicit that there's no built-in addressing or routing. You have to configure routes yourself at the OS level after starting xray-core (`ip route` / `route add` depending on platform). This tripped up an earlier version of this tool badly enough to cause crashes — don't skip it.
