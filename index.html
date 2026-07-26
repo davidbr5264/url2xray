@@ -109,10 +109,18 @@
       <div class="field"><label>HTTP port</label><input type="number" id="httpPort" value="10808"></div>
     </div>
     <div id="tunFields" class="grid" style="display:none;">
+      <div class="field"><label>Platform</label>
+        <select id="tunPlatform">
+          <option value="linux" selected>Linux</option>
+          <option value="windows">Windows</option>
+          <option value="macos">macOS</option>
+          <option value="freebsd">FreeBSD</option>
+        </select>
+      </div>
       <div class="field"><label>Interface name</label><input type="text" id="tunName" value="xray0"></div>
       <div class="field"><label>MTU</label><input type="number" id="tunMtu" value="1500"></div>
     </div>
-    <div class="note" id="tunNote" style="display:none;">xray-core's TUN inbound only brings the network interface up — it doesn't configure IP addressing or routing itself. After starting xray-core, you'll need to add routes at the OS level (<code>ip route</code> / <code>route add</code>, depending on platform). Also needs admin/root privileges, and on Windows, <code>wintun.dll</code> placed next to <code>xray.exe</code>.</div>
+    <div class="note" id="tunNote" style="display:none;"></div>
 
     <div class="check"><label class="check"><input type="checkbox" id="bypassPrivate" checked> Route private/LAN IPs directly</label></div>
     <div class="check"><label class="check"><input type="checkbox" id="blockAds"> Block ad/tracker domains</label></div>
@@ -493,6 +501,27 @@ function renderServerList(){
 
 document.getElementById('modeBtnSocks').addEventListener('click', () => setMode('socks'));
 document.getElementById('modeBtnTun').addEventListener('click', () => setMode('tun'));
+
+// Interface naming conventions genuinely differ by platform (xray-core's own proxy/tun/README.md):
+// Linux and Windows are free-form; macOS requires the "utunN" scheme; FreeBSD requires "tunN".
+const TUN_PLATFORMS = {
+  linux:   { defaultName: 'xray0',  pattern: null,          label: 'Interface names are free-form on Linux.' },
+  windows: { defaultName: 'xray0',  pattern: null,          label: 'Interface names are free-form on Windows, but you need <code>wintun.dll</code> placed next to <code>xray.exe</code> — it is not bundled.' },
+  macos:   { defaultName: 'utun10', pattern: /^utun\d+$/,   label: 'macOS <b>requires</b> the interface name to match the scheme <code>utunN</code> (e.g. <code>utun10</code>) — anything else fails.' },
+  freebsd: { defaultName: 'tun0',   pattern: /^tun\d+$/,    label: 'FreeBSD <b>requires</b> the interface name to match the scheme <code>tunN</code> (e.g. <code>tun0</code>) — anything else fails.' }
+};
+
+document.getElementById('tunPlatform').addEventListener('change', updateTunPlatform);
+function updateTunPlatform(){
+  const p = TUN_PLATFORMS[document.getElementById('tunPlatform').value];
+  document.getElementById('tunName').value = p.defaultName;
+  document.getElementById('tunNote').innerHTML =
+    'xray-core\'s TUN inbound only brings a bare network interface up — there is no built-in IP addressing or system routing. ' +
+    'After starting xray-core you have to configure routing yourself at the OS level, and route your proxy server\'s own address via your ' +
+    'real gateway <i>before</i> sending everything else through the tunnel, or xray\'s own connection to its server loops back through itself. ' +
+    'Needs admin/root privileges to create the interface. ' + p.label;
+}
+
 function setMode(mode){
   currentMode = mode;
   document.getElementById('modeBtnSocks').classList.toggle('active', mode === 'socks');
@@ -500,6 +529,7 @@ function setMode(mode){
   document.getElementById('socksFields').style.display = mode === 'socks' ? '' : 'none';
   document.getElementById('tunFields').style.display = mode === 'tun' ? '' : 'none';
   document.getElementById('tunNote').style.display = mode === 'tun' ? '' : 'none';
+  if(mode === 'tun') updateTunPlatform();
 }
 
 genBtn.addEventListener('click', () => {
@@ -511,6 +541,7 @@ genBtn.addEventListener('click', () => {
     mode: currentMode,
     socksPort: parseInt(document.getElementById('socksPort').value, 10) || 10809,
     httpPort: parseInt(document.getElementById('httpPort').value, 10) || 10808,
+    tunPlatform: document.getElementById('tunPlatform').value,
     tunName: document.getElementById('tunName').value.trim(),
     tunMtu: parseInt(document.getElementById('tunMtu').value, 10) || 1500,
     bypassPrivate: document.getElementById('bypassPrivate').checked,
@@ -523,6 +554,13 @@ genBtn.addEventListener('click', () => {
   if(opts.mode === 'socks' && opts.socksPort === opts.httpPort){
     outputWarning.innerHTML = '<div class="error">SOCKS port and HTTP port can\'t both be ' + opts.socksPort + ' — two inbounds can\'t bind the same port.</div>';
     return;
+  }
+  if(opts.mode === 'tun'){
+    const p = TUN_PLATFORMS[opts.tunPlatform];
+    if(p.pattern && !p.pattern.test(opts.tunName)){
+      outputWarning.innerHTML = '<div class="error">Interface name "' + escapeHtml(opts.tunName) + '" doesn\'t match the required scheme for ' + opts.tunPlatform + '. ' + p.label + '</div>';
+      return;
+    }
   }
 
   let cfg;
