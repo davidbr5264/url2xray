@@ -89,8 +89,7 @@
     <h2>3. Options</h2>
 
     <div id="socksFields" class="grid">
-      <div class="field"><label>SOCKS port</label><input type="number" id="socksPort" value="10809"></div>
-      <div class="field"><label>HTTP port</label><input type="number" id="httpPort" value="10808"></div>
+      <div class="field"><label>Port (SOCKS + HTTP, auto-detected)</label><input type="number" id="proxyPort" value="10808"></div>
       <div class="field"><label>Listen address</label>
         <select id="listenAddress">
           <option value="127.0.0.1" selected>127.0.0.1 (this device only)</option>
@@ -108,6 +107,7 @@
 
     <div class="check"><label class="check"><input type="checkbox" id="bypassPrivate" checked> Route private/LAN IPs directly</label></div>
     <div class="check"><label class="check"><input type="checkbox" id="blockAds"> Block ad/tracker domains</label></div>
+    <div class="check"><label class="check"><input type="checkbox" id="blockQuic"> Block QUIC (UDP/443) — forces browsers back to regular TLS, more reliable sniffing/blocking</label></div>
 
     <div class="field" style="margin-top:12px;">
       <label>Direct domains (bypass the proxy) — one per line or comma-separated</label>
@@ -115,7 +115,7 @@
     </div>
 
     <div class="grid" style="margin-top:12px;">
-      <div class="field"><label>DNS servers</label><input type="text" id="dnsServers" value="https://1.1.1.1/dns-query, https://dns.google/dns-query"></div>
+      <div class="field"><label>DNS servers</label><input type="text" id="dnsServers" value="https://1.1.1.1/dns-query, https://8.8.8.8/dns-query"></div>
       <div class="field"><label>Log level</label>
         <select id="logLevel">
           <option value="warning" selected>warning</option>
@@ -308,7 +308,7 @@ function buildStreamSettings(t){
     if(t.allowInsecure) ss.tlsSettings.allowInsecure = true;
   } else if(t.security === 'reality'){
     ss.security = 'reality';
-    ss.realitySettings = { serverName: t.sni, fingerprint: t.fp, password: t.pbk, shortId: t.sid || '', spiderX: t.spx || '' };
+    ss.realitySettings = { serverName: t.sni, fingerprint: t.fp, publicKey: t.pbk, shortId: t.sid || '', spiderX: t.spx || '' };
   } else {
     ss.security = 'none';
   }
@@ -379,17 +379,15 @@ function buildConfig(server, opts){
 
   const sniffing = { enabled: true, destOverride: ['http','tls','quic'] };
   const inbounds = [];
-  const socksSettings = { auth: 'noauth', udp: true, ip: '127.0.0.1' };
-  const httpSettings = {};
+  const mixedSettings = { auth: 'noauth', udp: true, ip: '127.0.0.1' };
   if(opts.requireAuth){
-    socksSettings.auth = 'password';
-    socksSettings.users = [{ user: opts.authUser, pass: opts.authPass }];
-    httpSettings.users = [{ user: opts.authUser, pass: opts.authPass }];
+    mixedSettings.auth = 'password';
+    mixedSettings.users = [{ user: opts.authUser, pass: opts.authPass }];
   }
-  inbounds.push({ tag: 'socks-in', listen: opts.listenAddress, port: opts.socksPort, protocol: 'socks', settings: socksSettings, sniffing });
-  inbounds.push({ tag: 'http-in', listen: opts.listenAddress, port: opts.httpPort, protocol: 'http', settings: httpSettings, sniffing });
+  inbounds.push({ tag: 'mixed-in', listen: opts.listenAddress, port: opts.port, protocol: 'mixed', settings: mixedSettings, sniffing });
 
   const rules = [];
+  if(opts.blockQuic) rules.push({ type: 'field', port: '443', network: 'udp', outboundTag: 'block' });
   if(opts.bypassPrivate) rules.push({ type: 'field', ip: ['geoip:private'], outboundTag: 'direct' });
   if(opts.directDomains && opts.directDomains.length) rules.push({ type: 'field', domain: opts.directDomains, outboundTag: 'direct' });
   if(opts.blockAds) rules.push({ type: 'field', domain: ['geosite:category-ads-all'], outboundTag: 'block' });
@@ -494,23 +492,19 @@ genBtn.addEventListener('click', () => {
   if(!server){ outputWarning.innerHTML = '<div class="error">Parse and select a server first.</div>'; return; }
 
   const opts = {
-    socksPort: parseInt(document.getElementById('socksPort').value, 10) || 10809,
-    httpPort: parseInt(document.getElementById('httpPort').value, 10) || 10808,
+    port: parseInt(document.getElementById('proxyPort').value, 10) || 10808,
     listenAddress: document.getElementById('listenAddress').value,
     requireAuth: document.getElementById('requireAuth').checked,
     authUser: document.getElementById('authUser').value.trim() || 'user',
     authPass: document.getElementById('authPass').value,
     bypassPrivate: document.getElementById('bypassPrivate').checked,
     blockAds: document.getElementById('blockAds').checked,
+    blockQuic: document.getElementById('blockQuic').checked,
     directDomains: parseDomainList(document.getElementById('directDomains').value),
     dnsList: document.getElementById('dnsServers').value.split(',').map(s => s.trim()).filter(Boolean),
     logLevel: document.getElementById('logLevel').value
   };
 
-  if(opts.socksPort === opts.httpPort){
-    outputWarning.innerHTML = '<div class="error">SOCKS port and HTTP port can\'t both be ' + opts.socksPort + ' — two inbounds can\'t bind the same port.</div>';
-    return;
-  }
   if(opts.requireAuth && !opts.authPass){
     outputWarning.innerHTML = '<div class="error">Auth is required but the password is empty.</div>';
     return;
@@ -522,6 +516,12 @@ genBtn.addEventListener('click', () => {
 
   if(server.protocol === 'hysteria'){
     outputWarning.innerHTML = '<div class="note">Hysteria2 outbound support in xray-core is newer and has had version-to-version bugs — test connectivity before relying on it.</div>';
+  }
+  if(server.transport && server.transport.allowInsecure){
+    outputWarning.innerHTML += '<div class="note"><b>This link disables certificate validation</b> (<code>allowInsecure=1</code>) — the generated config will accept any TLS certificate from the server, including a forged one. Only use this if you specifically trust why the link needs it (e.g. a self-signed cert you set up yourself).</div>';
+  }
+  if(server.protocol === 'hysteria' && server.insecure){
+    outputWarning.innerHTML += '<div class="note"><b>This link disables certificate validation</b> (<code>insecure=1</code>) — same caveat as above.</div>';
   }
   if(opts.listenAddress === '0.0.0.0' && !opts.requireAuth){
     outputWarning.innerHTML += '<div class="note">Listening on 0.0.0.0 opens this proxy to your whole LAN with no password — anyone on the network can use it. Turn on "Require a username/password" above if that\'s not intended.</div>';
