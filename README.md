@@ -33,6 +33,22 @@ A "Direct domains" field lets you list domains (or `geosite:`/`domain:`/`full:`/
 
 This is a rebuild after the previous version accumulated a lot of feature surface (mux, fragment, cert pinning, ECH, custom domain routing, fingerprint overrides, round-trip import, pre-export validation, per-OS TUN routing commands, a committed test suite). All of that got cut in favor of doing the core job well. If you need any of it, the generated JSON is a normal xray-core config — hand-edit it, or ask for a specific feature to be added back deliberately rather than by default.
 
+## Single mixed inbound + QUIC blocking
+
+Two changes adopted directly from the real v2rayN config analyzed above:
+
+- **One `mixed` inbound instead of separate SOCKS/HTTP inbounds.** A `mixed` protocol inbound auto-detects whether an incoming connection is speaking SOCKS5 or HTTP CONNECT on the same port, so there's now a single "Port" field (default `10808`, matching the convention) instead of two, and the port-collision check that existed purely to guard against two inbounds sharing a port is gone — there's only one inbound now, so the problem it guarded against no longer exists.
+- **"Block QUIC (UDP/443)" checkbox.** Adds a routing rule blocking UDP/443 outright, forcing browsers back to regular TCP+TLS. This is a real pattern used in production configs — sniffing and domain-based routing are more reliable against TLS ClientHello than against QUIC, so blocking QUIC outright sidesteps that gap entirely rather than trying to sniff it.
+
+## Corrected against a real v2rayN config
+
+A real, working config.json from v2rayN (a widely-used Windows xray-core client) surfaced two things worth fixing directly:
+
+- **REALITY field reverted to `publicKey`.** Earlier in this project I switched to `password` based on doc wording alone. The actual commit history shows `password` was added as an *alias* of `publicKey`, not a replacement — both work, but `publicKey` is what v2rayN and essentially every real-world guide/tutorial actually generates. Matching the ecosystem's dominant convention matters more here than technically-newer-but-rarely-used naming.
+- **Fixed a DNS bootstrap bug.** The default DNS servers included `https://dns.google/dns-query` — a DoH endpoint whose *own hostname* needs to be resolved before it can be reached, a circular dependency if it's ever actually needed. Switched to `https://8.8.8.8/dns-query` (same provider, IP-form host, no bootstrap problem) alongside `https://1.1.1.1/dns-query`.
+
+Also confirmed real but not adopted for this "simple" tool: that config blocks UDP/443 to force QUIC back to regular TLS, uses a single `mixed` inbound (SOCKS+HTTP auto-detected on one port) instead of two separate ones, and uses a `dns.tag`+`inboundTag`-routing trick to send xray's own DNS queries through the proxy tunnel — though that last one had what looks like a rule-ordering mistake in the example itself (the relevant rules sat after a catch-all that would already have consumed everything).
+
 ## Schema notes (verified against xray-core's own docs)
 
 - Outbounds use the current flat schema (no `vnext`/`servers` arrays).
