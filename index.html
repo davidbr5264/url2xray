@@ -262,7 +262,8 @@ function parseShadowsocks(link){
   let method, password, address, port;
   if(parts){
     let userinfo = parts.userinfo;
-    const decoded = looksBase64(userinfo) ? b64decode(userinfo) : decodeURIComponent(userinfo);
+    let decoded = b64decode(userinfo);
+    if(!decoded || !decoded.includes(':')) decoded = decodeURIComponent(userinfo);
     if(decoded && decoded.includes(':')){ const ci = decoded.indexOf(':'); method = decoded.slice(0, ci); password = decoded.slice(ci+1); }
     else throw new Error('ss: could not parse method:password');
     ({address, port} = splitHostPort(decodeURIComponent(parts.hostport)));
@@ -377,7 +378,10 @@ function buildConfig(server, opts){
   const outbound = buildOutbound(server, 'proxy');
   if(!outbound) throw new Error('unsupported protocol');
 
-  const sniffing = { enabled: true, destOverride: ['http','tls','quic'] };
+  // When QUIC is blocked outright, there's nothing to gain from sniffing it first — matches
+  // the reference config, which never includes "quic" in destOverride for the same reason.
+  const destOverride = opts.blockQuic ? ['http','tls'] : ['http','tls','quic'];
+  const sniffing = { enabled: true, destOverride };
   const inbounds = [];
   const mixedSettings = { auth: 'noauth', udp: true, ip: '127.0.0.1' };
   if(opts.requireAuth){
@@ -391,6 +395,9 @@ function buildConfig(server, opts){
   if(opts.bypassPrivate) rules.push({ type: 'field', ip: ['geoip:private'], outboundTag: 'direct' });
   if(opts.directDomains && opts.directDomains.length) rules.push({ type: 'field', domain: opts.directDomains, outboundTag: 'direct' });
   if(opts.blockAds) rules.push({ type: 'field', domain: ['geosite:category-ads-all'], outboundTag: 'block' });
+  // Explicit catch-all instead of relying on "unmatched traffic falls to the first outbound" —
+  // same effect, but doesn't silently break if outbounds are ever reordered later.
+  rules.push({ type: 'field', port: '0-65535', outboundTag: 'proxy' });
 
   return {
     log: { loglevel: opts.logLevel },
