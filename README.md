@@ -33,6 +33,12 @@ A "Direct domains" field lets you list domains (or `geosite:`/`domain:`/`full:`/
 
 This is a rebuild after the previous version accumulated a lot of feature surface (mux, fragment, cert pinning, ECH, custom domain routing, fingerprint overrides, round-trip import, pre-export validation, per-OS TUN routing commands, a committed test suite). All of that got cut in favor of doing the core job well. If you need any of it, the generated JSON is a normal xray-core config — hand-edit it, or ask for a specific feature to be added back deliberately rather than by default.
 
+## Two more patterns adopted, plus an unrelated bug caught along the way
+
+- **QUIC excluded from sniffing when it's blocked anyway.** If "Block QUIC" is on, `destOverride` no longer includes `"quic"` — matches the reference config exactly; there's nothing to gain sniffing traffic that gets blocked outright before the sniffed result would ever matter.
+- **Explicit catch-all routing rule** (`port: "0-65535" → proxy`) added at the end of the rules array, instead of relying on the implicit "unmatched traffic falls to the first outbound" behavior. Same effect today, but doesn't silently break if outbounds are ever reordered later — matches the reference config's own explicit catch-all.
+- **Unrelated bug found and fixed while testing:** a short (≤20 char) base64-encoded `method:password` in a SIP002 Shadowsocks link (`ss://BASE64@host:port`) was being rejected by a length heuristic meant for a different purpose (subscription-blob detection). Short passwords are completely valid, so this was a real, silent parse failure for some real-world links. Fixed by just trying the base64 decode directly and checking if it produced a sane result, instead of gatekeeping on string length first.
+
 ## Single mixed inbound + QUIC blocking
 
 Two changes adopted directly from the real v2rayN config analyzed above:
