@@ -88,6 +88,19 @@
   <section id="optionsSection" style="display:none;">
     <h2>3. Options</h2>
 
+    <div class="grid">
+      <div class="field"><label>Device</label>
+        <select id="device">
+          <option value="windows" selected>Windows</option>
+          <option value="macos">macOS</option>
+          <option value="linux">Linux</option>
+          <option value="android">Android</option>
+          <option value="ios">iOS</option>
+        </select>
+      </div>
+    </div>
+    <div class="note" id="deviceNote"></div>
+
     <div id="socksFields" class="grid">
       <div class="field"><label>Port (SOCKS + HTTP, auto-detected)</label><input type="number" id="proxyPort" value="10808"></div>
       <div class="field"><label>Listen address</label>
@@ -156,6 +169,14 @@ function b64decode(str){
 }
 function looksBase64(s){ return /^[A-Za-z0-9+/_-]+={0,2}$/.test(s) && s.length > 20; }
 function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function looksPrivateAddress(addr){
+  if(!addr) return false;
+  if(/^127\.|^10\.|^192\.168\.|^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(addr)) return true;
+  if(addr === 'localhost' || addr === '::1') return true;
+  if(/\.(local|lan|internal)$/i.test(addr)) return true;
+  if(/^f[cd][0-9a-f]{2}:/i.test(addr)) return true; // fc00::/7 (IPv6 unique local)
+  return false;
+}
 
 // A pasted "https://example.com/path" would never match a sniffed SNI/Host value (those are
 // bare hostnames only) — strip scheme/path so direct-domain entries actually work, unless the
@@ -409,9 +430,31 @@ function buildConfig(server, opts){
   // same effect, but doesn't silently break if outbounds are ever reordered later.
   rules.push({ type: 'field', port: '0-65535', outboundTag: 'proxy' });
 
+  const catchallServers = opts.dnsList.length ? opts.dnsList : ['https://1.1.1.1/dns-query'];
+  let dns;
+  if(opts.device === 'windows'){
+    // Mirrors the split-DNS pattern from the reference Windows (v2rayN) config: a plain fast
+    // resolver handles private/local domains directly (skipFallback avoids ever falling through
+    // to the encrypted resolver for those), and hosts[] bootstraps any named DoH endpoint so
+    // resolving its own hostname doesn't depend on DNS that isn't working yet.
+    dns = {
+      hosts: {
+        'one.one.one.one': ['1.1.1.1', '1.0.0.1'],
+        'cloudflare-dns.com': ['104.16.249.249', '104.16.248.249'],
+        'dns.google': ['8.8.8.8', '8.8.4.4']
+      },
+      servers: [
+        { address: '1.1.1.1', domains: ['geosite:private'], skipFallback: true },
+        ...catchallServers
+      ]
+    };
+  } else {
+    dns = { servers: catchallServers };
+  }
+
   return {
     log: { loglevel: opts.logLevel },
-    dns: { servers: opts.dnsList.length ? opts.dnsList : ['https://1.1.1.1/dns-query'] },
+    dns,
     inbounds,
     outbounds: [
       outbound,
@@ -499,6 +542,24 @@ function renderServerList(){
   });
 }
 
+// Real-world usage differs more than the JSON schema does: Windows/macOS/Linux commonly run
+// xray-core directly (or via a GUI wrapper like v2rayN/Qv2ray) pointed at a config.json like this.
+// Android/iOS GUI clients (v2rayNG, NekoBox, Shadowrocket, Streisand, Quantumult X) overwhelmingly
+// import the share link or subscription URL directly instead — confirmed by checking how those
+// apps actually document their own import flow, not assumed.
+const DEVICE_INFO = {
+  windows: { dns: 'split', note: 'Point Windows at this proxy under Settings → Network & Internet → Proxy (manual setup), or use the "system proxy" toggle in a GUI wrapper like v2rayN.' },
+  macos:   { dns: 'flat',  note: 'Set the proxy under System Settings → Network → Wi-Fi/Ethernet → Details → Proxies, or from a terminal: <code>networksetup -setsocksfirewallproxy Wi-Fi 127.0.0.1 10808</code>.' },
+  linux:   { dns: 'flat',  note: 'Set your desktop environment\'s proxy settings, or export environment variables in a shell: <code>export ALL_PROXY=socks5://127.0.0.1:10808</code>.' },
+  android: { dns: 'flat',  note: '<b>Most Android apps don\'t use this file.</b> v2rayNG/NekoBox/HiddifyNG import the original share link or subscription URL directly — paste that in instead. This config.json is only relevant if you\'re running the xray-core binary yourself (e.g. via Termux).' },
+  ios:     { dns: 'flat',  note: '<b>Most iOS apps don\'t use this file.</b> Shadowrocket/Streisand/Quantumult X import the original share link directly — paste that in instead. iOS doesn\'t support running a standalone xray-core binary with a custom config.json outside advanced/jailbreak setups.' }
+};
+function updateDeviceNote(){
+  document.getElementById('deviceNote').innerHTML = DEVICE_INFO[document.getElementById('device').value].note;
+}
+document.getElementById('device').addEventListener('change', updateDeviceNote);
+updateDeviceNote();
+
 document.getElementById('requireAuth').addEventListener('change', e => {
   document.getElementById('authFields').style.display = e.target.checked ? '' : 'none';
 });
@@ -509,6 +570,7 @@ genBtn.addEventListener('click', () => {
   if(!server){ outputWarning.innerHTML = '<div class="error">Parse and select a server first.</div>'; return; }
 
   const opts = {
+    device: document.getElementById('device').value,
     port: parseInt(document.getElementById('proxyPort').value, 10) || 10808,
     listenAddress: document.getElementById('listenAddress').value,
     requireAuth: document.getElementById('requireAuth').checked,
@@ -531,6 +593,9 @@ genBtn.addEventListener('click', () => {
   try{ cfg = buildConfig(server, opts); }
   catch(e){ outputWarning.innerHTML = '<div class="error">' + escapeHtml(e.message) + '</div>'; return; }
 
+  if(opts.device === 'android' || opts.device === 'ios'){
+    outputWarning.innerHTML += '<div class="note">' + DEVICE_INFO[opts.device].note + '</div>';
+  }
   if(server.protocol === 'hysteria'){
     outputWarning.innerHTML = '<div class="note">Hysteria2 outbound support in xray-core is newer and has had version-to-version bugs — test connectivity before relying on it.</div>';
   }
@@ -539,6 +604,10 @@ genBtn.addEventListener('click', () => {
   }
   if(server.transport && server.transport.allowInsecure){
     outputWarning.innerHTML += '<div class="note"><b>This link disables certificate validation</b> (<code>allowInsecure=1</code>) — the generated config will accept any TLS certificate from the server, including a forged one. Only use this if you specifically trust why the link needs it (e.g. a self-signed cert you set up yourself).</div>';
+  }
+  const hasVlessEncryption = server.protocol === 'vless' && server.encryption && server.encryption !== 'none';
+  if(server.transport && server.transport.security === 'none' && !hasVlessEncryption && !looksPrivateAddress(server.address)){
+    outputWarning.innerHTML += '<div class="note"><b>No transport security on a public address.</b> This link has no TLS/REALITY and no VLESS Encryption. xray-core\'s own docs say this combination is only intended for a private/local peer — traffic to a public server like this one won\'t be encrypted at the transport layer at all.</div>';
   }
   if(server.protocol === 'hysteria' && server.insecure){
     outputWarning.innerHTML += '<div class="note"><b>This link disables certificate validation</b> (<code>insecure=1</code>) — same caveat as above.</div>';
