@@ -105,7 +105,7 @@
       <div class="field"><label>Password</label><input type="text" id="authPass" value=""></div>
     </div>
 
-    <div class="check"><label class="check"><input type="checkbox" id="bypassPrivate" checked> Route private/LAN IPs directly</label></div>
+    <div class="check"><label class="check"><input type="checkbox" id="bypassPrivate" checked> Route private/LAN traffic directly (IPs and local domains)</label></div>
     <div class="check"><label class="check"><input type="checkbox" id="blockAds"> Block ad/tracker domains</label></div>
     <div class="check"><label class="check"><input type="checkbox" id="blockQuic"> Block QUIC (UDP/443) — forces browsers back to regular TLS, more reliable sniffing/blocking</label></div>
 
@@ -285,7 +285,9 @@ function parseHysteria2(link){
   const {address, port} = splitHostPort(decodeURIComponent(hostport));
   return {
     id: ++serverIdCounter, protocol:'hysteria', remark: remark || address, address, port, auth,
-    sni: query.get('sni') || query.get('peer') || address, insecure: query.get('insecure') === '1'
+    sni: query.get('sni') || query.get('peer') || address, insecure: query.get('insecure') === '1',
+    obfs: query.get('obfs') || '', obfsPassword: query.get('obfs-password') || '',
+    pinSHA256: query.get('pinSHA256') || ''
   };
 }
 function parseAnyLink(link){
@@ -363,12 +365,17 @@ function buildOutbound(server, tag){
     case 'shadowsocks':
       return { protocol: 'shadowsocks', tag,
         settings: { address: server.address, port: server.port, method: server.method, password: server.password, level: 0 } };
-    case 'hysteria':
+    case 'hysteria': {
+      const hysteriaSettings = { version: 2, auth: server.auth, udpIdleTimeout: 60 };
+      if(server.obfs === 'salamander' && server.obfsPassword){
+        hysteriaSettings.udpmasks = [{ type: 'salamander', settings: { password: server.obfsPassword } }];
+      }
+      const tlsSettings = Object.assign({ serverName: server.sni, alpn: ['h3'] }, server.insecure ? { allowInsecure: true } : {});
+      if(server.pinSHA256) tlsSettings.pinnedPeerCertSha256 = server.pinSHA256;
       return { protocol: 'hysteria', tag,
         settings: { version: 2, address: server.address, port: server.port },
-        streamSettings: { network: 'hysteria', security: 'tls',
-          tlsSettings: Object.assign({ serverName: server.sni, alpn: ['h3'] }, server.insecure ? { allowInsecure: true } : {}),
-          hysteriaSettings: { version: 2, auth: server.auth, udpIdleTimeout: 60 } } };
+        streamSettings: { network: 'hysteria', security: 'tls', tlsSettings, hysteriaSettings } };
+    }
     default: return null;
   }
 }
@@ -392,7 +399,10 @@ function buildConfig(server, opts){
 
   const rules = [];
   if(opts.blockQuic) rules.push({ type: 'field', port: '443', network: 'udp', outboundTag: 'block' });
-  if(opts.bypassPrivate) rules.push({ type: 'field', ip: ['geoip:private'], outboundTag: 'direct' });
+  if(opts.bypassPrivate){
+    rules.push({ type: 'field', ip: ['geoip:private'], outboundTag: 'direct' });
+    rules.push({ type: 'field', domain: ['geosite:private'], outboundTag: 'direct' });
+  }
   if(opts.directDomains && opts.directDomains.length) rules.push({ type: 'field', domain: opts.directDomains, outboundTag: 'direct' });
   if(opts.blockAds) rules.push({ type: 'field', domain: ['geosite:category-ads-all'], outboundTag: 'block' });
   // Explicit catch-all instead of relying on "unmatched traffic falls to the first outbound" —
@@ -523,6 +533,9 @@ genBtn.addEventListener('click', () => {
 
   if(server.protocol === 'hysteria'){
     outputWarning.innerHTML = '<div class="note">Hysteria2 outbound support in xray-core is newer and has had version-to-version bugs — test connectivity before relying on it.</div>';
+  }
+  if(server.protocol === 'hysteria' && server.obfs){
+    outputWarning.innerHTML += '<div class="note"><b>This link uses "' + escapeHtml(server.obfs) + '" obfuscation.</b> xray-core has a known, currently-open compatibility bug (XTLS/Xray-core#5712) connecting to real Hysteria2 servers that have Salamander obfuscation enabled — it can time out even with a matching password. Included in the config since dropping it silently would be worse, but if the connection times out, this is the likely reason.</div>';
   }
   if(server.transport && server.transport.allowInsecure){
     outputWarning.innerHTML += '<div class="note"><b>This link disables certificate validation</b> (<code>allowInsecure=1</code>) — the generated config will accept any TLS certificate from the server, including a forged one. Only use this if you specifically trust why the link needs it (e.g. a self-signed cert you set up yourself).</div>';
