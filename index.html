@@ -435,14 +435,21 @@ function buildConfig(server, opts){
   if(opts.device === 'windows'){
     // Mirrors the split-DNS pattern from the reference Windows (v2rayN) config: a plain fast
     // resolver handles private/local domains directly (skipFallback avoids ever falling through
-    // to the encrypted resolver for those), and hosts[] bootstraps any named DoH endpoint so
-    // resolving its own hostname doesn't depend on DNS that isn't working yet.
+    // to the encrypted resolver for those). hosts[] only gets populated with bootstrap entries
+    // for domain-named DoH hostnames actually present below — with the default IP-form servers
+    // there's nothing to bootstrap, so it's correctly omitted rather than included as dead weight.
+    const KNOWN_DOH_HOSTS = {
+      'one.one.one.one': ['1.1.1.1', '1.0.0.1'],
+      'cloudflare-dns.com': ['104.16.249.249', '104.16.248.249'],
+      'dns.google': ['8.8.8.8', '8.8.4.4']
+    };
+    const neededHosts = {};
+    catchallServers.forEach(s => {
+      const m = /^https?:\/\/([^/:]+)/.exec(s);
+      if(m && KNOWN_DOH_HOSTS[m[1]]) neededHosts[m[1]] = KNOWN_DOH_HOSTS[m[1]];
+    });
     dns = {
-      hosts: {
-        'one.one.one.one': ['1.1.1.1', '1.0.0.1'],
-        'cloudflare-dns.com': ['104.16.249.249', '104.16.248.249'],
-        'dns.google': ['8.8.8.8', '8.8.4.4']
-      },
+      ...(Object.keys(neededHosts).length ? { hosts: neededHosts } : {}),
       servers: [
         { address: '1.1.1.1', domains: ['geosite:private'], skipFallback: true },
         ...catchallServers
@@ -597,7 +604,7 @@ genBtn.addEventListener('click', () => {
     outputWarning.innerHTML += '<div class="note">' + DEVICE_INFO[opts.device].note + '</div>';
   }
   if(server.protocol === 'hysteria'){
-    outputWarning.innerHTML = '<div class="note">Hysteria2 outbound support in xray-core is newer and has had version-to-version bugs — test connectivity before relying on it.</div>';
+    outputWarning.innerHTML += '<div class="note">Hysteria2 outbound support in xray-core is newer and has had version-to-version bugs — test connectivity before relying on it.</div>';
   }
   if(server.protocol === 'hysteria' && server.obfs){
     outputWarning.innerHTML += '<div class="note"><b>This link uses "' + escapeHtml(server.obfs) + '" obfuscation.</b> xray-core has a known, currently-open compatibility bug (XTLS/Xray-core#5712) connecting to real Hysteria2 servers that have Salamander obfuscation enabled — it can time out even with a matching password. Included in the config since dropping it silently would be worse, but if the connection times out, this is the likely reason.</div>';
