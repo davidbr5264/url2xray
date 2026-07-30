@@ -33,6 +33,42 @@ A "Direct domains" field lets you list domains (or `geosite:`/`domain:`/`full:`/
 
 This is a rebuild after the previous version accumulated a lot of feature surface (mux, fragment, cert pinning, ECH, custom domain routing, fingerprint overrides, round-trip import, pre-export validation, per-OS TUN routing commands, a committed test suite). All of that got cut in favor of doing the core job well. If you need any of it, the generated JSON is a normal xray-core config — hand-edit it, or ask for a specific feature to be added back deliberately rather than by default.
 
+## Cleanup pass
+
+Did a full line-by-line read-through of the file looking for inconsistencies rather than new features. Found two real things:
+
+- **A real bug**: the Hysteria2 compatibility warning was written as `outputWarning.innerHTML = '...'` (overwrite) instead of `+=` (append). Harmless on its own, but if the device was set to Android/iOS *and* the parsed server was Hysteria2, this silently wiped out the "most apps don't use this file" caveat that had just been added right before it. Fixed to append like every other warning does.
+- **Dead-weight JSON on Windows**: the `dns.hosts` bootstrap block was always included with three fixed entries, but with the default IP-form DNS servers (`https://1.1.1.1/dns-query`), none of those entries were ever actually referenced by anything — they were inert. Made this dynamic: it now only includes a `hosts` entry for a domain-named DoH hostname if that hostname is actually present in the configured DNS server list. Default output no longer carries unused bootstrap entries; customizing the DNS field to a domain-form endpoint (like `https://cloudflare-dns.com/dns-query`) now correctly produces exactly the one bootstrap entry needed for it — nothing more, nothing less.
+
+Verified both with the exact scenario that exposed the first bug (Android device + Hysteria2 link — both warnings now show together), and confirmed the `hosts` block is absent by default and appears correctly scoped when needed.
+
+## Device type: Windows, macOS, Linux, Android, iOS
+
+An honest note before the feature list: since TUN mode was removed, the `config.json` itself barely differs across desktop OSes — a `mixed` SOCKS+HTTP inbound is identical cross-platform in xray-core. So "device type" mostly changes DNS structure and practical setup guidance, not some fictional per-OS JSON schema. Verified this by checking how real Android/iOS clients actually document their own import flow, rather than assuming.
+
+- **Windows** — follows the structure of the config you uploaded: `dns.hosts` bootstraps well-known DoH hostnames (so resolving them doesn't depend on DNS that isn't working yet), plus a plain fast resolver scoped to `geosite:private` with `skipFallback`, ahead of the encrypted DoH catch-all. (Adapted to globally-neutral Cloudflare/Google IPs rather than the China-specific DNSPod resolver in the original — the *structure* is what's being followed, not a locale-specific server choice that wouldn't suit everyone.)
+- **macOS / Linux** — the simpler flat DoH list (as before), plus a practical setup tip: `networksetup -setsocksfirewallproxy` for macOS, `export ALL_PROXY=socks5://...` for Linux.
+- **Android / iOS — an honest caveat, not a fake JSON difference.** Real clients (v2rayNG, NekoBox, HiddifyNG, Shadowrocket, Streisand, Quantumult X) import the original share link or a subscription URL directly — they don't consume a raw xray-core `config.json` the way v2rayN does. Selecting either of these shows that plainly, rather than pretending this file is the normal workflow there. It's still generated correctly and is genuinely useful if you're running xray-core directly (e.g. via Termux on Android), just not for the mainstream app experience.
+
+## New: warning for VLESS with no transport security on a public address
+
+Read through xray-core's own VLESS docs page fully (not just search snippets this time) and found an explicit WARNING box: VLESS with no outer TLS/REALITY layer is only intended for a private/local peer, or when VLESS Encryption is configured — anything else sends traffic with zero transport-layer encryption. This tool now surfaces that as a warning when it applies: `security: none`, no VLESS Encryption string, and the server address isn't a private IP/`.local`/`.lan`/`localhost`. Correctly stays silent for private addresses, for links that do specify VLESS Encryption, and for anything using real TLS/REALITY — verified all four combinations explicitly.
+
+Also confirmed while reading that page: the VLESS Encryption string format (`mlkem768x25519plus.native.0rtt.<padding-blocks>.<key>`) is exactly as complex as it looks, and this tool's approach of passing it through completely opaquely — never trying to parse, validate, or reconstruct it — is the correct one; xray-core's own docs recommend generating it via `xray vlessenc` rather than hand-building it, which is exactly what a hand-off/pass-through approach respects.
+
+## "Private" now covers domains too, not just IPs
+
+Re-reading the reference config once more turned up one clear thing still missing: it bypasses private/local traffic with **two** rules, not one — `geoip:private` for IPs and `geosite:private` for domains (router admin panels, local mDNS-style hostnames, etc.). This tool only had the IP rule. The "Route private/LAN traffic directly" checkbox now adds both together.
+
+Deliberately *not* changed to match the reference: `routing.domainStrategy` stays `IPIfNonMatch` rather than the reference's `AsIs` — it gives the private-bypass rules a better chance of catching a domain that resolves to a private IP but isn't on the `geosite:private` list, which matters more now that domain-based bypass exists too, not less.
+
+## Hysteria2: obfuscation and cert pinning were being silently dropped
+
+Re-checked the actual canonical `hysteria2://` URI spec (v2.hysteria.network) — it defines `obfs`, `obfs-password`, `sni`, `insecure`, and `pinSHA256` as standard query params. This tool was only ever reading `sni`/`insecure`; `obfs`/`obfs-password`/`pinSHA256` were silently thrown away.
+
+- **`pinSHA256`** now maps straight to `tlsSettings.pinnedPeerCertSha256` — simple, safe, standard.
+- **`obfs`/`obfs-password`** (Salamander obfuscation) now maps to `hysteriaSettings.udpmasks`, xray-core's actual current field for this (confirmed via a real xray-core GitHub issue showing the correct shape — it's *not* a flat `obfs` field). **But** — that same issue (XTLS/Xray-core#5712) reports a currently-open, unresolved bug: xray-core's Salamander implementation can time out connecting to real Hysteria2 servers with obfuscation enabled, even with a correct password. Since silently dropping the obfuscation info would just produce a different, more confusing failure, it's included in the config, but the tool now shows a clear warning naming the specific issue when a link requests it — so a timeout has an actual explanation instead of being a mystery.
+
 ## Two more patterns adopted, plus an unrelated bug caught along the way
 
 - **QUIC excluded from sniffing when it's blocked anyway.** If "Block QUIC" is on, `destOverride` no longer includes `"quic"` — matches the reference config exactly; there's nothing to gain sniffing traffic that gets blocked outright before the sniffed result would ever matter.
